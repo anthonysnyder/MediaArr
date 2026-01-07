@@ -12,15 +12,17 @@
     <div class="row">
         {% for artwork in artworks %}
         <div class="col-md-{% if artwork_type == 'poster' %}2{% elif artwork_type == 'logo' %}3{% else %}4{% endif %} mb-4">
-            <div class="card">
-                <img src="{{ artwork.url }}" class="card-img-top" alt="{{ artwork_type.capitalize() }}" style="width: 100%; height: auto;">
-                <div class="card-body">
-                    <p class="card-text">
-                        <small>
-                            <strong>Size:</strong> {{ artwork.size }}<br>
-                            <strong>Lang:</strong> {{ artwork.language }}
-                        </small>
-                    </p>
+            <div class="card" style="background: linear-gradient(145deg, #2a2d31 0%, #1f2124 100%); border: 1px solid #333; border-radius: 8px;">
+                <img src="{{ artwork.url }}" class="card-img-top" alt="{{ artwork_type.capitalize() }}" style="width: 100%; height: auto; border-top-left-radius: 8px; border-top-right-radius: 8px;">
+                <div class="card-body" style="padding: 1rem; background-color: #1f2124;">
+                    <div style="margin-bottom: 0.75rem; min-height: 40px;">
+                        <div style="font-size: 0.8rem; color: #adb5bd; margin-bottom: 0.25rem;">
+                            <strong style="color: #fff;">Size:</strong> {{ artwork.size }}
+                        </div>
+                        <div style="font-size: 0.8rem; color: #adb5bd;">
+                            <strong style="color: #fff;">Lang:</strong> {{ artwork.language }}
+                        </div>
+                    </div>
                     <form method="POST" action="{{ url_for('download_artwork') }}">
                         <input type="hidden" name="artwork_url" value="{{ artwork.url }}">
                         <input type="hidden" name="artwork_type" value="{{ artwork_type }}">
