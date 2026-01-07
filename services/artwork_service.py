@@ -165,53 +165,53 @@ class ArtworkService:
                     if not dir_files and '.' in media_dir:
                         continue
                 except:
-                    dir_files = set()
+                    # If we can't list the directory, skip it
                     continue
 
-                    # Build media item with inline artwork checking (reduces function call overhead)
-                    clean_id = ArtworkService.generate_clean_id(media_dir)
-                    directory_name = os.path.basename(media_path)
+                # Build media item with inline artwork checking (reduces function call overhead)
+                clean_id = ArtworkService.generate_clean_id(media_dir)
+                directory_name = os.path.basename(media_path)
 
-                    media_item = {
-                        'title': media_dir,
-                        'directory_path': media_path,
-                        'clean_id': clean_id,
-                    }
+                media_item = {
+                    'title': media_dir,
+                    'directory_path': media_path,
+                    'clean_id': clean_id,
+                }
 
-                    # Check each artwork type efficiently
-                    for artwork_type in ['backdrop', 'logo', 'poster']:
-                        has_artwork = False
-                        web_path = None
-                        web_thumb_path = None
-                        dimensions = None
-                        last_modified = None
+                # Check each artwork type efficiently
+                for artwork_type in ['backdrop', 'logo', 'poster']:
+                    has_artwork = False
+                    web_path = None
+                    web_thumb_path = None
+                    dimensions = None
+                    last_modified = None
 
-                        # Check for artwork files (in order of preference)
-                        for ext in ArtworkService.ARTWORK_EXTENSIONS[artwork_type]:
-                            artwork_file = f'{artwork_type}.{ext}'
-                            thumb_file = f'{artwork_type}-thumb.{ext}'
+                    # Check for artwork files (in order of preference)
+                    for ext in ArtworkService.ARTWORK_EXTENSIONS[artwork_type]:
+                        artwork_file = f'{artwork_type}.{ext}'
+                        thumb_file = f'{artwork_type}-thumb.{ext}'
 
-                            # Use cached dir listing instead of os.path.exists()
-                            if artwork_file in dir_files:
-                                has_artwork = True
-                                web_path = f"/artwork/{urllib.parse.quote(directory_name)}/{artwork_file}"
+                        # Use cached dir listing instead of os.path.exists()
+                        if artwork_file in dir_files:
+                            has_artwork = True
+                            web_path = f"/artwork/{urllib.parse.quote(directory_name)}/{artwork_file}"
 
-                                # Only check thumb if we found the main artwork
-                                if thumb_file in dir_files:
-                                    web_thumb_path = f"/artwork/{urllib.parse.quote(directory_name)}/{thumb_file}"
+                            # Only check thumb if we found the main artwork
+                            if thumb_file in dir_files:
+                                web_thumb_path = f"/artwork/{urllib.parse.quote(directory_name)}/{thumb_file}"
 
-                                # Skip expensive operations (dimensions, mtime) - not needed for listing
-                                # These will be fetched on-demand if needed
-                                break
+                            # Skip expensive operations (dimensions, mtime) - not needed for listing
+                            # These will be fetched on-demand if needed
+                            break
 
-                        # Add to media item
-                        media_item[f'{artwork_type}'] = web_path
-                        media_item[f'{artwork_type}_thumb'] = web_thumb_path
-                        media_item[f'{artwork_type}_dimensions'] = dimensions
-                        media_item[f'{artwork_type}_last_modified'] = last_modified
-                        media_item[f'has_{artwork_type}'] = has_artwork
+                    # Add to media item
+                    media_item[f'{artwork_type}'] = web_path
+                    media_item[f'{artwork_type}_thumb'] = web_thumb_path
+                    media_item[f'{artwork_type}_dimensions'] = dimensions
+                    media_item[f'{artwork_type}_last_modified'] = last_modified
+                    media_item[f'has_{artwork_type}'] = has_artwork
 
-                    media_list.append(media_item)
+                media_list.append(media_item)
 
         # Sort by title, ignoring leading "The"
         media_list = sorted(
