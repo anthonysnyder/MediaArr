@@ -12,20 +12,20 @@
     {% if results %}
         {% for result in results %}
         <div class="col-md-3 mb-4">
-            <div class="card">
+            <div class="card" style="background: linear-gradient(145deg, #2a2d31 0%, #1f2124 100%); border: 1px solid #333; border-radius: 8px;">
                 {% if result.poster_path %}
-                    <img src="https://image.tmdb.org/t/p/w500{{ result.poster_path }}" class="card-img-top" alt="{{ result.title or result.name }}">
+                    <img src="https://image.tmdb.org/t/p/w500{{ result.poster_path }}" class="card-img-top" alt="{{ result.title or result.name }}" style="border-top-left-radius: 8px; border-top-right-radius: 8px;">
                 {% else %}
-                    <div class="card-img-top bg-secondary text-center py-5">
-                        <span>No Poster</span>
+                    <div class="card-img-top text-center py-5" style="background-color: #212529; border-top-left-radius: 8px; border-top-right-radius: 8px;">
+                        <span style="color: #6c757d;">No Poster</span>
                     </div>
                 {% endif %}
-                <div class="card-body">
-                    <h5 class="card-title">{{ result.title or result.name }}</h5>
+                <div class="card-body" style="padding: 1rem; background-color: #1f2124;">
+                    <h5 class="card-title" style="color: #fff; font-size: 1rem; margin-bottom: 0.5rem;">{{ result.title or result.name }}</h5>
                     {% if result.release_date %}
-                        <p class="card-text"><small>Release: {{ result.release_date }}</small></p>
+                        <p class="card-text" style="color: #adb5bd; font-size: 0.85rem; margin-bottom: 0.75rem;"><small>Release: {{ result.release_date }}</small></p>
                     {% elif result.first_air_date %}
-                        <p class="card-text"><small>First Air: {{ result.first_air_date }}</small></p>
+                        <p class="card-text" style="color: #adb5bd; font-size: 0.85rem; margin-bottom: 0.75rem;"><small>First Air: {{ result.first_air_date }}</small></p>
                     {% endif %}
                     <a href="{{ url_for('select_artwork', media_type=media_type, tmdb_id=result.id, artwork_type=artwork_type, directory=directory) }}"
                        class="btn btn-custom btn-block">
