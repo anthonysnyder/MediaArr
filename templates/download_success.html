@@ -15,18 +15,18 @@
 </div>
 
 <div style="text-align: center; margin-top: 2rem;">
-    <button onclick="history.back()" class="btn btn-custom" style="margin-right: 0.5rem;">
-        ← Go Back
+    <button onclick="history.go(-2)" class="btn btn-custom" style="margin-right: 0.5rem;">
+        ← Back to Collection
     </button>
     <a href="{{ url_for('index' if media_type == 'movie' else 'tv_shows') }}" class="btn btn-secondary">
-        View Collection
+        Refresh Collection
     </a>
 </div>
 
 <script>
-// Automatically go back after 2 seconds
+// Automatically go back twice (to collection page) after 2 seconds
 setTimeout(function() {
-    history.back();
+    history.go(-2);
 }, 2000);
 </script>
 {% endblock %}
