@@ -123,6 +123,7 @@ class ArtworkService:
     def scan_media_directories(base_folders: List[str]) -> Tuple[List[dict], int]:
         """
         Scan media directories and collect all artwork information.
+        Optimized to reduce file system operations on SMB mounts.
 
         Args:
             base_folders: List of base folder paths to scan
@@ -141,40 +142,54 @@ class ArtworkService:
                 media_path = os.path.join(base_folder, media_dir)
 
                 if os.path.isdir(media_path):
-                    # Get info for each artwork type
-                    backdrop_info = ArtworkService.get_artwork_info(media_path, 'backdrop')
-                    logo_info = ArtworkService.get_artwork_info(media_path, 'logo')
-                    poster_info = ArtworkService.get_artwork_info(media_path, 'poster')
+                    # Optimization: Get all files in directory once to avoid repeated listdir calls
+                    try:
+                        dir_files = set(safe_listdir(media_path))
+                    except:
+                        dir_files = set()
 
-                    # Build media item
+                    # Build media item with inline artwork checking (reduces function call overhead)
                     clean_id = ArtworkService.generate_clean_id(media_dir)
+                    directory_name = os.path.basename(media_path)
 
                     media_item = {
                         'title': media_dir,
                         'directory_path': media_path,
                         'clean_id': clean_id,
-
-                        # Backdrop
-                        'backdrop': backdrop_info['web_path'],
-                        'backdrop_thumb': backdrop_info['web_thumb_path'],
-                        'backdrop_dimensions': backdrop_info['dimensions'],
-                        'backdrop_last_modified': backdrop_info['last_modified'],
-                        'has_backdrop': backdrop_info['has_artwork'],
-
-                        # Logo
-                        'logo': logo_info['web_path'],
-                        'logo_thumb': logo_info['web_thumb_path'],
-                        'logo_dimensions': logo_info['dimensions'],
-                        'logo_last_modified': logo_info['last_modified'],
-                        'has_logo': logo_info['has_artwork'],
-
-                        # Poster
-                        'poster': poster_info['web_path'],
-                        'poster_thumb': poster_info['web_thumb_path'],
-                        'poster_dimensions': poster_info['dimensions'],
-                        'poster_last_modified': poster_info['last_modified'],
-                        'has_poster': poster_info['has_artwork'],
                     }
+
+                    # Check each artwork type efficiently
+                    for artwork_type in ['backdrop', 'logo', 'poster']:
+                        has_artwork = False
+                        web_path = None
+                        web_thumb_path = None
+                        dimensions = None
+                        last_modified = None
+
+                        # Check for artwork files (in order of preference)
+                        for ext in ArtworkService.ARTWORK_EXTENSIONS[artwork_type]:
+                            artwork_file = f'{artwork_type}.{ext}'
+                            thumb_file = f'{artwork_type}-thumb.{ext}'
+
+                            # Use cached dir listing instead of os.path.exists()
+                            if artwork_file in dir_files:
+                                has_artwork = True
+                                web_path = f"/artwork/{urllib.parse.quote(directory_name)}/{artwork_file}"
+
+                                # Only check thumb if we found the main artwork
+                                if thumb_file in dir_files:
+                                    web_thumb_path = f"/artwork/{urllib.parse.quote(directory_name)}/{thumb_file}"
+
+                                # Skip expensive operations (dimensions, mtime) - not needed for listing
+                                # These will be fetched on-demand if needed
+                                break
+
+                        # Add to media item
+                        media_item[f'{artwork_type}'] = web_path
+                        media_item[f'{artwork_type}_thumb'] = web_thumb_path
+                        media_item[f'{artwork_type}_dimensions'] = dimensions
+                        media_item[f'{artwork_type}_last_modified'] = last_modified
+                        media_item[f'has_{artwork_type}'] = has_artwork
 
                     media_list.append(media_item)
 
