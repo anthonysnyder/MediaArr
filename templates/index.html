@@ -1,0 +1,187 @@
+{% extends "base.html" %}
+
+{% block title %}Movies - MediaArr{% endblock %}
+
+{% block content %}
+<!-- Page Header -->
+<div class="page-header">
+    <h1>Movie Collection</h1>
+    <div class="stats-bar">
+        <div class="stat-item">
+            <strong>Total:</strong> {{ stats.total }} movies
+        </div>
+        <div class="stat-item">
+            <strong>Backdrops:</strong> {{ stats.with_backdrop }}/{{ stats.total }}
+        </div>
+        <div class="stat-item">
+            <strong>Logos:</strong> {{ stats.with_logo }}/{{ stats.total }}
+        </div>
+        <div class="stat-item">
+            <strong>Posters:</strong> {{ stats.with_poster }}/{{ stats.total }}
+        </div>
+    </div>
+</div>
+
+<!-- Filter Controls -->
+<div class="filter-controls">
+    <input type="text" id="searchInput" placeholder="🔍 Filter movies by title...">
+
+    <div class="artwork-filter-badges">
+        <div class="filter-badge all active" data-filter="all">All</div>
+        <div class="filter-badge backdrop" data-filter="backdrop">🎬 Missing Backdrop</div>
+        <div class="filter-badge logo" data-filter="logo">🏷️ Missing Logo</div>
+        <div class="filter-badge poster" data-filter="poster">🎭 Missing Poster</div>
+    </div>
+
+    <button class="btn btn-custom" onclick="location.href='{{ url_for('refresh') }}'">↻ Refresh</button>
+</div>
+
+<!-- Media Grid -->
+<div class="media-grid">
+    {% for movie in movies %}
+    <div class="media-card" id="{{ movie.clean_id }}"
+         data-title="{{ movie.title | lower }}"
+         data-has-backdrop="{{ movie.has_backdrop | lower }}"
+         data-has-logo="{{ movie.has_logo | lower }}"
+         data-has-poster="{{ movie.has_poster | lower }}">
+
+        <!-- Backdrop Section -->
+        <div class="backdrop-section" onclick="selectArtwork('{{ movie.title | escapejs }}', 'movie', 'backdrop', '{{ movie.title | escapejs }}')">
+            {% if movie.backdrop_thumb %}
+                <img src="{{ movie.backdrop_thumb }}" alt="{{ movie.title }} Backdrop">
+            {% elif movie.backdrop %}
+                <img src="{{ movie.backdrop }}" alt="{{ movie.title }} Backdrop">
+            {% else %}
+                <div class="placeholder">❌ No Backdrop<br><small>Click to add</small></div>
+            {% endif %}
+            <div class="artwork-overlay">
+                <span>{% if movie.has_backdrop %}Click to change backdrop{% else %}Add backdrop{% endif %}</span>
+            </div>
+        </div>
+
+        <!-- Bottom Row: Logo + Poster -->
+        <div class="bottom-row">
+            <div class="logo-section" onclick="selectArtwork('{{ movie.title | escapejs }}', 'movie', 'logo', '{{ movie.title | escapejs }}')">
+                {% if movie.logo_thumb %}
+                    <img src="{{ movie.logo_thumb }}" alt="{{ movie.title }} Logo">
+                {% elif movie.logo %}
+                    <img src="{{ movie.logo }}" alt="{{ movie.title }} Logo">
+                {% else %}
+                    <div class="placeholder">❌ No Logo<br><small>Click to add</small></div>
+                {% endif %}
+                <div class="artwork-overlay">
+                    <span>{% if movie.has_logo %}Change logo{% else %}Add logo{% endif %}</span>
+                </div>
+            </div>
+
+            <div class="poster-section" onclick="selectArtwork('{{ movie.title | escapejs }}', 'movie', 'poster', '{{ movie.title | escapejs }}')">
+                {% if movie.poster_thumb %}
+                    <img src="{{ movie.poster_thumb }}" alt="{{ movie.title }} Poster">
+                {% elif movie.poster %}
+                    <img src="{{ movie.poster }}" alt="{{ movie.title }} Poster">
+                {% else %}
+                    <div class="placeholder">❌ No Poster<br><small>Click to add</small></div>
+                {% endif %}
+                <div class="artwork-overlay">
+                    <span>{% if movie.has_poster %}Change poster{% else %}Add poster{% endif %}</span>
+                </div>
+            </div>
+        </div>
+
+        <!-- Card Footer -->
+        <div class="card-footer-info">
+            <div class="card-title">{{ movie.title }}</div>
+            <div class="artwork-status">
+                <span class="status-badge {% if movie.has_backdrop %}has-backdrop{% else %}no-backdrop{% endif %}">
+                    {% if movie.has_backdrop %}BACKDROP{% else %}NO BACKDROP{% endif %}
+                </span>
+                <span class="status-badge {% if movie.has_logo %}has-logo{% else %}no-logo{% endif %}">
+                    {% if movie.has_logo %}LOGO{% else %}NO LOGO{% endif %}
+                </span>
+                <span class="status-badge {% if movie.has_poster %}has-poster{% else %}no-poster{% endif %}">
+                    {% if movie.has_poster %}POSTER{% else %}NO POSTER{% endif %}
+                </span>
+            </div>
+        </div>
+    </div>
+    {% endfor %}
+</div>
+{% endblock %}
+
+{% block extra_js %}
+<script>
+    // Function to trigger artwork selection search
+    function selectArtwork(title, mediaType, artworkType, directoryName) {
+        // Clean the title by removing unwanted characters
+        const cleanTitle = title
+            .replace(/\(\d{4}\)/g, '') // Remove year
+            .replace(/[^a-zA-Z0-9\s]/g, '') // Remove non-alphanumeric
+            .trim();
+
+        // Redirect to search with artwork type parameter
+        const searchUrl = `/search_${mediaType}?query=${encodeURIComponent(cleanTitle.toLowerCase())}&directory=${encodeURIComponent(directoryName)}&artwork_type=${artworkType}`;
+        window.location.href = searchUrl;
+    }
+
+    // Filter functionality
+    document.querySelectorAll('.filter-badge').forEach(badge => {
+        badge.addEventListener('click', function() {
+            // Update active state
+            document.querySelectorAll('.filter-badge').forEach(b => b.classList.remove('active'));
+            this.classList.add('active');
+
+            const filter = this.dataset.filter;
+            const cards = document.querySelectorAll('.media-card');
+
+            cards.forEach(card => {
+                const hasBackdrop = card.dataset.hasBackdrop === 'true';
+                const hasLogo = card.dataset.hasLogo === 'true';
+                const hasPoster = card.dataset.hasPoster === 'true';
+
+                let show = false;
+
+                switch(filter) {
+                    case 'all':
+                        show = true;
+                        break;
+                    case 'backdrop':
+                        show = !hasBackdrop;
+                        break;
+                    case 'logo':
+                        show = !hasLogo;
+                        break;
+                    case 'poster':
+                        show = !hasPoster;
+                        break;
+                }
+
+                card.style.display = show ? 'block' : 'none';
+            });
+        });
+    });
+
+    // Search functionality
+    document.getElementById('searchInput').addEventListener('keyup', function() {
+        const query = this.value.toLowerCase();
+        const cards = document.querySelectorAll('.media-card');
+
+        cards.forEach(card => {
+            const title = card.dataset.title;
+            card.style.display = title.includes(query) ? 'block' : 'none';
+        });
+    });
+
+    // Scroll to anchor on page load
+    window.addEventListener('load', function() {
+        if (window.location.hash) {
+            const targetId = window.location.hash.substring(1);
+            const targetElement = document.getElementById(targetId);
+            if (targetElement) {
+                setTimeout(function() {
+                    targetElement.scrollIntoView({ behavior: 'smooth', block: 'center' });
+                }, 100);
+            }
+        }
+    });
+</script>
+{% endblock %}

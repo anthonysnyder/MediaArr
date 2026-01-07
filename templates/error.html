@@ -1,0 +1,14 @@
+{% extends "base.html" %}
+
+{% block title %}Error {{ code }} - MediaArr{% endblock %}
+
+{% block content %}
+<div class="container text-center" style="padding-top: 5rem;">
+    <h1 class="display-1">{{ code }}</h1>
+    <p class="lead">{{ error }}</p>
+    <div class="mt-4">
+        <a href="{{ url_for('index') }}" class="btn btn-custom">← Back to Movies</a>
+        <a href="{{ url_for('dashboard') }}" class="btn btn-secondary">Dashboard</a>
+    </div>
+</div>
+{% endblock %}

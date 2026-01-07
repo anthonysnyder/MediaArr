@@ -1,0 +1,89 @@
+{% extends "base.html" %}
+
+{% block title %}Dashboard - MediaArr{% endblock %}
+
+{% block content %}
+<div class="page-header">
+    <h1>Dashboard</h1>
+    <p class="text-muted">Overview of your media artwork collection</p>
+</div>
+
+<div class="row">
+    <!-- Movies Stats -->
+    <div class="col-md-6 mb-4">
+        <div class="card">
+            <div class="card-body">
+                <h3>📁 Movies</h3>
+                <hr>
+                <div class="stats-bar flex-column align-items-start">
+                    <div class="stat-item mb-2">
+                        <strong>Total Movies:</strong> {{ stats.movies.total }}
+                    </div>
+                    <div class="stat-item mb-2">
+                        <strong>With Backdrops:</strong> {{ stats.movies.with_backdrop }} / {{ stats.movies.total }}
+                        <span class="text-muted">({{ "%.1f"|format((stats.movies.with_backdrop / stats.movies.total * 100) if stats.movies.total > 0 else 0) }}%)</span>
+                    </div>
+                    <div class="stat-item mb-2">
+                        <strong>With Logos:</strong> {{ stats.movies.with_logo }} / {{ stats.movies.total }}
+                        <span class="text-muted">({{ "%.1f"|format((stats.movies.with_logo / stats.movies.total * 100) if stats.movies.total > 0 else 0) }}%)</span>
+                    </div>
+                    <div class="stat-item mb-2">
+                        <strong>With Posters:</strong> {{ stats.movies.with_poster }} / {{ stats.movies.total }}
+                        <span class="text-muted">({{ "%.1f"|format((stats.movies.with_poster / stats.movies.total * 100) if stats.movies.total > 0 else 0) }}%)</span>
+                    </div>
+                </div>
+                <div class="mt-3">
+                    <a href="{{ url_for('index') }}" class="btn btn-custom">Manage Movies →</a>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- TV Shows Stats -->
+    <div class="col-md-6 mb-4">
+        <div class="card">
+            <div class="card-body">
+                <h3>📺 TV Shows</h3>
+                <hr>
+                <div class="stats-bar flex-column align-items-start">
+                    <div class="stat-item mb-2">
+                        <strong>Total Shows:</strong> {{ stats.tv.total }}
+                    </div>
+                    <div class="stat-item mb-2">
+                        <strong>With Backdrops:</strong> {{ stats.tv.with_backdrop }} / {{ stats.tv.total }}
+                        <span class="text-muted">({{ "%.1f"|format((stats.tv.with_backdrop / stats.tv.total * 100) if stats.tv.total > 0 else 0) }}%)</span>
+                    </div>
+                    <div class="stat-item mb-2">
+                        <strong>With Logos:</strong> {{ stats.tv.with_logo }} / {{ stats.tv.total }}
+                        <span class="text-muted">({{ "%.1f"|format((stats.tv.with_logo / stats.tv.total * 100) if stats.tv.total > 0 else 0) }}%)</span>
+                    </div>
+                    <div class="stat-item mb-2">
+                        <strong>With Posters:</strong> {{ stats.tv.with_poster }} / {{ stats.tv.total }}
+                        <span class="text-muted">({{ "%.1f"|format((stats.tv.with_poster / stats.tv.total * 100) if stats.tv.total > 0 else 0) }}%)</span>
+                    </div>
+                </div>
+                <div class="mt-3">
+                    <a href="{{ url_for('tv_shows') }}" class="btn btn-custom">Manage TV Shows →</a>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Quick Actions -->
+<div class="row">
+    <div class="col-12">
+        <div class="card">
+            <div class="card-body">
+                <h3>Quick Actions</h3>
+                <hr>
+                <div class="btn-group" role="group">
+                    <a href="{{ url_for('index') }}" class="btn btn-custom">View Movies</a>
+                    <a href="{{ url_for('tv_shows') }}" class="btn btn-custom">View TV Shows</a>
+                    <a href="{{ url_for('refresh') }}" class="btn btn-custom">↻ Refresh All</a>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}
