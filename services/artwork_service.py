@@ -6,6 +6,7 @@ import os
 import re
 import urllib.parse
 import requests
+import time
 from datetime import datetime
 from difflib import SequenceMatcher
 from typing import List, Optional, Tuple
@@ -24,6 +25,10 @@ class ArtworkService:
         'logo': ['png', 'jpg', 'jpeg'],
         'poster': ['jpg', 'jpeg', 'png']
     }
+
+    # Simple cache for scan results (cache for 60 seconds)
+    _scan_cache = {}
+    _cache_duration = 60  # seconds
 
     @staticmethod
     def normalize_title(title: str) -> str:
@@ -124,6 +129,7 @@ class ArtworkService:
         """
         Scan media directories and collect all artwork information.
         Optimized to reduce file system operations on SMB mounts.
+        Uses simple time-based caching to avoid re-scanning on every page load.
 
         Args:
             base_folders: List of base folder paths to scan
@@ -131,22 +137,36 @@ class ArtworkService:
         Returns:
             Tuple of (list of media items, total count)
         """
+        # Create cache key from folder paths
+        cache_key = ','.join(sorted(base_folders))
+
+        # Check cache
+        if cache_key in ArtworkService._scan_cache:
+            cached_data, cached_time = ArtworkService._scan_cache[cache_key]
+            if time.time() - cached_time < ArtworkService._cache_duration:
+                return cached_data, len(cached_data)
+
         media_list = []
 
         for base_folder in base_folders:
             for media_dir in sorted(safe_listdir(base_folder)):
-                # Skip Synology NAS system folders
-                if media_dir.lower() in ["@eadir", "#recycle"]:
+                # Skip Synology NAS system folders and hidden files
+                if media_dir.lower() in ["@eadir", "#recycle"] or media_dir.startswith('.'):
                     continue
 
                 media_path = os.path.join(base_folder, media_dir)
 
-                if os.path.isdir(media_path):
-                    # Optimization: Get all files in directory once to avoid repeated listdir calls
-                    try:
-                        dir_files = set(safe_listdir(media_path))
-                    except:
-                        dir_files = set()
+                # Optimization: Skip os.path.isdir() check - assume everything is a directory
+                # This saves a file system operation per directory on SMB mounts
+                # If it's not a directory, safe_listdir will return empty list
+                try:
+                    dir_files = set(safe_listdir(media_path))
+                    # If listdir returned nothing and it's actually a file, skip it
+                    if not dir_files and '.' in media_dir:
+                        continue
+                except:
+                    dir_files = set()
+                    continue
 
                     # Build media item with inline artwork checking (reduces function call overhead)
                     clean_id = ArtworkService.generate_clean_id(media_dir)
@@ -198,6 +218,9 @@ class ArtworkService:
             media_list,
             key=lambda x: ArtworkService.strip_leading_the(x['title'].lower())
         )
+
+        # Store in cache
+        ArtworkService._scan_cache[cache_key] = (media_list, time.time())
 
         return media_list, len(media_list)
 
