@@ -25,6 +25,9 @@ RUN pip install --no-cache-dir -r requirements.txt
 # Copy the rest of the app
 COPY . /app
 
+# Fix permissions for all files
+RUN chmod -R 755 /app
+
 # Expose the port that Flask runs on
 EXPOSE 5000
 
