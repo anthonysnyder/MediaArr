@@ -4,10 +4,52 @@ Image processing utilities for creating thumbnails
 
 from PIL import Image
 import os
+import time
+import io
 
 
 class ImageProcessor:
     """Handles image processing for different artwork types"""
+
+    @staticmethod
+    def _safe_image_save(img, output_path: str, format: str, retries: int = 8, base_delay: float = 0.05, **save_kwargs):
+        """
+        Safely save PIL Image with retry logic for SMB mounts.
+        First saves to memory buffer, then writes to file with retry logic.
+
+        Args:
+            img: PIL Image object
+            output_path: Path to save image
+            format: Image format (e.g., "JPEG", "PNG")
+            retries: Number of retry attempts
+            base_delay: Initial delay in seconds (exponential backoff)
+            **save_kwargs: Additional arguments for img.save()
+
+        Returns:
+            True on success
+
+        Raises:
+            BlockingIOError or OSError: If all retries fail
+        """
+        # First, save to memory buffer
+        buffer = io.BytesIO()
+        img.save(buffer, format, **save_kwargs)
+        content = buffer.getvalue()
+
+        # Then write to file with retry logic
+        last_exc = None
+        for attempt in range(retries):
+            try:
+                with open(output_path, 'wb') as f:
+                    f.write(content)
+                return True
+            except (BlockingIOError, OSError) as e:
+                last_exc = e
+                if attempt < retries - 1:
+                    time.sleep(base_delay * (2 ** attempt))
+
+        # If all retries fail, raise the last exception
+        raise last_exc
 
     @staticmethod
     def create_backdrop_thumbnail(source_path: str, output_path: str):
@@ -40,8 +82,8 @@ class ImageProcessor:
                 # Resize to 300x169
                 img_resized = img.resize((300, 169), Image.LANCZOS)
 
-                # Save as JPEG with high quality
-                img_resized.save(output_path, "JPEG", quality=90)
+                # Save as JPEG with high quality using SMB-safe save
+                ImageProcessor._safe_image_save(img_resized, output_path, "JPEG", quality=90)
 
             return True
 
@@ -75,8 +117,8 @@ class ImageProcessor:
                 # Resize with high-quality Lanczos resampling
                 img_resized = img.resize((new_width, new_height), Image.LANCZOS)
 
-                # Save as PNG to preserve transparency
-                img_resized.save(output_path, "PNG", optimize=True)
+                # Save as PNG to preserve transparency using SMB-safe save
+                ImageProcessor._safe_image_save(img_resized, output_path, "PNG", optimize=True)
 
             return True
 
@@ -115,8 +157,8 @@ class ImageProcessor:
                 # Resize the image to 300x450 pixels with high-quality Lanczos resampling
                 img_resized = img.resize((300, 450), Image.LANCZOS)
 
-                # Save the thumbnail image with high JPEG quality
-                img_resized.save(output_path, "JPEG", quality=90)
+                # Save the thumbnail image with high JPEG quality using SMB-safe save
+                ImageProcessor._safe_image_save(img_resized, output_path, "JPEG", quality=90)
 
             return True
 

@@ -12,6 +12,7 @@ from typing import List, Optional, Tuple
 
 from utils import safe_listdir, ImageProcessor
 from utils.mapping_utils import get_mapped_directory, save_mapped_directory
+from utils.file_utils import safe_file_write, safe_file_remove
 
 
 class ArtworkService:
@@ -216,15 +217,13 @@ class ArtworkService:
         thumb_path = os.path.join(save_dir, f'{artwork_type}-thumb.{ext}')
 
         try:
-            # Remove any existing artwork files
+            # Remove any existing artwork files using SMB-safe removal
             for e in ArtworkService.ARTWORK_EXTENSIONS[artwork_type]:
                 existing_file = os.path.join(save_dir, f'{artwork_type}.{e}')
                 existing_thumb = os.path.join(save_dir, f'{artwork_type}-thumb.{e}')
 
-                if os.path.exists(existing_file):
-                    os.remove(existing_file)
-                if os.path.exists(existing_thumb):
-                    os.remove(existing_thumb)
+                safe_file_remove(existing_file)
+                safe_file_remove(existing_thumb)
 
             # Download the artwork
             response = requests.get(artwork_url)
@@ -232,9 +231,8 @@ class ArtworkService:
                 print(f"Failed to download {artwork_type} for '{media_title}'. Status: {response.status_code}")
                 return None
 
-            # Save the full-resolution artwork
-            with open(full_path, 'wb') as file:
-                file.write(response.content)
+            # Save the full-resolution artwork using SMB-safe write
+            safe_file_write(full_path, response.content)
 
             # Create thumbnail based on artwork type
             success = False
