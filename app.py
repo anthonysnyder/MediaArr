@@ -328,14 +328,20 @@ def download_artwork():
             message = f"{artwork_type.capitalize()} for '{media_title}' has been downloaded!"
             slack_service.send_notification(message, local_path, artwork_url)
 
-            flash(f"{artwork_type.capitalize()} saved successfully!", "success")
+            # Return success page with JavaScript to go back
+            # This uses browser cache instead of triggering a new scan
+            return render_template(
+                'download_success.html',
+                artwork_type=artwork_type,
+                media_title=media_title,
+                media_type=media_type
+            )
         else:
             flash(f"Failed to save {artwork_type}", "error")
-
-        # Redirect back to main page with anchor
-        redirect_url = url_for('tv_shows' if media_type == 'tv' else 'index')
-        anchor = f"#{ArtworkService.generate_clean_id(media_title)}"
-        return redirect(redirect_url + anchor)
+            # On failure, redirect normally
+            redirect_url = url_for('tv_shows' if media_type == 'tv' else 'index')
+            anchor = f"#{ArtworkService.generate_clean_id(media_title)}"
+            return redirect(redirect_url + anchor)
 
     except Exception as e:
         app.logger.exception(f"Error downloading artwork: {e}")
