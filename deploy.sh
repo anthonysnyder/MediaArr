@@ -1,8 +1,8 @@
 #!/bin/bash
 set -e
 
-echo "🚀 MediaArr Deployment Script"
-echo "=============================="
+echo "🚀 Mediarr Deployment Script"
+echo "============================="
 echo ""
 
 # Colors
@@ -13,7 +13,7 @@ NC='\033[0m' # No Color
 
 # Configuration
 DOCKER_USER="swguru2004"
-DOCKER_REPO="mediaarr"
+DOCKER_REPO="mediarr"
 VERSION="latest"
 
 echo "📋 Configuration:"
@@ -29,21 +29,16 @@ echo ""
 
 # Step 2: Docker Build and Push
 echo -e "${YELLOW}Step 2: Building and pushing Docker image...${NC}"
-
-# Check if logged in to Docker Hub
-if ! docker info | grep -q "Username: ${DOCKER_USER}"; then
-    echo -e "${RED}Please login to Docker Hub first:${NC}"
-    echo "docker login"
-    exit 1
-fi
+echo "Note: Make sure you're logged in to Docker Hub (docker login)"
+echo ""
 
 # Create buildx builder if it doesn't exist
-if ! docker buildx ls | grep -q "mediaarr-builder"; then
+if ! docker buildx ls | grep -q "mediarr-builder"; then
     echo "Creating buildx builder for multi-arch..."
-    docker buildx create --name mediaarr-builder --use
+    docker buildx create --name mediarr-builder --use
 else
-    echo "Using existing mediaarr-builder..."
-    docker buildx use mediaarr-builder
+    echo "Using existing mediarr-builder..."
+    docker buildx use mediarr-builder
 fi
 
 # Build and push multi-architecture image
@@ -61,13 +56,13 @@ echo ""
 echo "=============================="
 echo -e "${GREEN}🎉 Deployment Complete!${NC}"
 echo ""
-echo "📦 GitHub: https://github.com/anthonysnyder/MediaArr"
+echo "📦 GitHub: https://github.com/anthonysnyder/Mediarr"
 echo "🐳 Docker: ${DOCKER_USER}/${DOCKER_REPO}:${VERSION}"
 echo ""
 echo "To pull on your Mac Mini:"
 echo "  docker pull ${DOCKER_USER}/${DOCKER_REPO}:${VERSION}"
 echo ""
 echo "To run:"
-echo "  cd /path/to/mediaarr"
+echo "  cd /path/to/mediarr"
 echo "  docker-compose pull"
 echo "  docker-compose up -d"

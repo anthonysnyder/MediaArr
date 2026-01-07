@@ -1,10 +1,10 @@
-# MediaArr
+# Mediarr
 
 **Unified artwork management for your media library**
 
-MediaArr is a web application that manages backdrops, logos, and posters for your movie and TV show collection from a single, beautiful interface. No more juggling three separate tools - see all your artwork status at a glance and fill in the gaps with ease.
+Mediarr is a web application that manages backdrops, logos, and posters for your movie and TV show collection from a single, beautiful interface. No more juggling three separate tools - see all your artwork status at a glance and fill in the gaps with ease.
 
-![MediaArr Interface](https://via.placeholder.com/800x400?text=MediaArr+Screenshot)
+![Mediarr Interface](https://via.placeholder.com/800x400?text=Mediarr+Screenshot)
 
 ## Features
 
@@ -59,7 +59,7 @@ docker-compose up -d
 
 ```bash
 docker run -d \
-  --name=mediaarr \
+  --name=mediarr \
   -p 5000:5000 \
   -e TMDB_API_KEY=your_api_key \
   -e MOVIE_FOLDERS=/movies,/kids-movies \
@@ -68,7 +68,7 @@ docker run -d \
   -v /path/to/tv:/tv \
   -v ./data:/app/data \
   --user 1000:1000 \
-  mediaarr:latest
+  mediarr:latest
 ```
 
 ## Configuration
@@ -93,16 +93,16 @@ docker run -d \
 
 ### Folder Structure
 
-MediaArr expects your media to be organized like:
+Mediarr expects your media to be organized like:
 ```
 /movies/
   ├── The Matrix (1999)/
   │   ├── movie.mkv
-  │   ├── backdrop.jpg          # Downloaded by MediaArr
+  │   ├── backdrop.jpg          # Downloaded by Mediarr
   │   ├── backdrop-thumb.jpg    # Auto-generated thumbnail
-  │   ├── logo.png              # Downloaded by MediaArr
+  │   ├── logo.png              # Downloaded by Mediarr
   │   ├── logo-thumb.png        # Auto-generated thumbnail
-  │   ├── poster.jpg            # Downloaded by MediaArr
+  │   ├── poster.jpg            # Downloaded by Mediarr
   │   └── poster-thumb.jpg      # Auto-generated thumbnail
   └── Inception (2010)/
       └── ...
@@ -120,7 +120,7 @@ MediaArr expects your media to be organized like:
 
 ### Three-Tier Directory Matching
 
-MediaArr uses a smart three-tier strategy to match TMDb results to your local directories:
+Mediarr uses a smart three-tier strategy to match TMDb results to your local directories:
 
 1. **UI Hint** (Highest Priority) - When you click a card, the directory name is passed through the entire flow
 2. **Cached Mapping** - Previously saved TMDb ID → directory mappings from `/app/data/tmdb_directory_mapping.json`
@@ -130,7 +130,7 @@ This prevents the "backdrop overwriting" bug and ensures artwork always goes to 
 
 ### Artwork Availability Tracking
 
-MediaArr remembers when TMDb doesn't have a specific artwork type:
+Mediarr remembers when TMDb doesn't have a specific artwork type:
 
 ```json
 {
@@ -150,7 +150,7 @@ This prevents repeated unsuccessful searches and survives container restarts.
 
 ### SMB Mount Support
 
-MediaArr includes retry logic with exponential backoff for:
+Mediarr includes retry logic with exponential backoff for:
 - Directory listing (`safe_listdir`)
 - File serving (`safe_send_file`)
 
@@ -170,9 +170,9 @@ docker stop backgroundarr logoarr postarr
 cp /path/to/logoarr/tmdb_directory_mapping.json ~/logoarr-mapping-backup.json
 ```
 
-3. **Deploy MediaArr** with the same volume mounts
+3. **Deploy Mediarr** with the same volume mounts
 
-4. **First run**: MediaArr will scan all existing artwork automatically
+4. **First run**: Mediarr will scan all existing artwork automatically
 
 5. **Verify**: Check that all your existing artwork shows up correctly
 
@@ -185,7 +185,7 @@ docker rm backgroundarr logoarr postarr
 
 ## API Endpoints
 
-MediaArr provides a RESTful-ish interface:
+Mediarr provides a RESTful-ish interface:
 
 | Endpoint | Method | Description |
 |----------|--------|-------------|
@@ -205,8 +205,8 @@ MediaArr provides a RESTful-ish interface:
 
 ```bash
 # Clone the repo
-git clone https://github.com/yourusername/mediaarr.git
-cd mediaarr
+git clone https://github.com/anthonysnyder/Mediarr.git
+cd Mediarr
 
 # Create virtual environment
 python -m venv venv
@@ -227,7 +227,7 @@ python app.py
 ### Project Structure
 
 ```
-mediaarr/
+mediarr/
 ├── app.py                 # Main Flask application
 ├── requirements.txt
 ├── Dockerfile
@@ -264,7 +264,7 @@ mediaarr/
 
 ### Artwork not downloading
 
-1. **Check logs**: `docker logs mediaarr`
+1. **Check logs**: `docker logs mediarr`
 2. **Verify TMDb API key**: Make sure it's valid and has permissions
 3. **Check permissions**: Ensure PUID/PGID have write access to media folders
 4. **Network issues**: Test TMDb connectivity from container
@@ -278,7 +278,7 @@ mediaarr/
 
 ### SMB mount issues
 
-1. **Increase retries**: MediaArr retries 8 times with exponential backoff
+1. **Increase retries**: Mediarr retries 8 times with exponential backoff
 2. **Check mount health**: `ls -la /path/to/mount` from container
 3. **Review logs**: Look for `BlockingIOError` messages
 
@@ -295,8 +295,8 @@ MIT License - See LICENSE file for details
 
 ## Support
 
-- **Issues**: [GitHub Issues](https://github.com/yourusername/mediaarr/issues)
-- **Discussions**: [GitHub Discussions](https://github.com/yourusername/mediaarr/discussions)
+- **Issues**: [GitHub Issues](https://github.com/anthonysnyder/Mediarr/issues)
+- **Discussions**: [GitHub Discussions](https://github.com/anthonysnyder/Mediarr/discussions)
 
 ---
 

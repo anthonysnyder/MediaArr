@@ -1,42 +1,51 @@
 version: '3.8'
 
 services:
-  mediaarr:
-    image: swguru2004/mediaarr:latest
-    container_name: mediaarr
-    restart: unless-stopped
+  mediarr:
+    image: swguru2004/mediarr:latest
+    container_name: mediarr
+    restart: always
 
     ports:
-      - "5000:5000"
+      - "1596:5000"
 
     environment:
       # Required: TMDb API Key
       - TMDB_API_KEY=${TMDB_API_KEY}
 
       # Optional: Folder Configuration
-      - MOVIE_FOLDERS=/movies,/kids-movies,/anime
-      - TV_FOLDERS=/tv,/kids-tv
+      - MOVIE_FOLDERS=/movies,/kids-movies
+      - TV_FOLDERS=/tv,/kids-tv,/anime
 
       # Optional: Slack Notifications
-      - SLACK_WEBHOOK_URL=${SLACK_WEBHOOK_URL:-}
+      - SLACK_WEBHOOK_URL=${BACKGROUNDARR_SLACK_WEBHOOK:-}
 
-      # Optional: User/Group IDs (for file permissions)
-      - PUID=1000
-      - PGID=1000
+      # User/Group IDs (for file permissions)
+      - PUID=501
+      - PGID=20
+
+      # Timezone
+      - TZ=America/Los_Angeles
 
       # Optional: Server Configuration
       - PORT=5000
-      - SECRET_KEY=${SECRET_KEY:-change-this-secret-key}
 
     volumes:
-      # Mount your media folders (adjust paths as needed)
-      - /path/to/movies:/movies
-      - /path/to/kids-movies:/kids-movies
-      - /path/to/anime:/anime
-      - /path/to/tv:/tv
-      - /path/to/kids-tv:/kids-tv
-
       # Persistent data for TMDb mapping
-      - ./data:/app/data
+      - /Users/thejollyroger/docker/mediarr/config:/app/data
 
-    user: "${PUID:-1000}:${PGID:-1000}"
+      # Mount your media folders
+      - /Volumes/UNAS_Data/Media/Movies:/movies:cached
+      - /Volumes/UNAS_Data/Media/TV Shows:/tv:cached
+      - /Volumes/UNAS_Data/Media/Anime:/anime:cached
+      - "/Volumes/UNAS_Data/Media/Kids Movies:/kids-movies:cached"
+      - "/Volumes/UNAS_Data/Media/Kids TV:/kids-tv:cached"
+
+    user: "${PUID:-501}:${PGID:-20}"
+
+    networks:
+      - media
+
+networks:
+  media:
+    external: true

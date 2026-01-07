@@ -1,8 +1,8 @@
-# MediaArr Deployment Guide
+# Mediarr Deployment Guide
 
 ## Pre-Deployment Checklist
 
-Before deploying MediaArr, make sure you have:
+Before deploying Mediarr, make sure you have:
 
 - [ ] TMDb API key ([get one here](https://www.themoviedb.org/settings/api))
 - [ ] Docker and Docker Compose installed
@@ -52,7 +52,7 @@ docker-compose build
 docker-compose up -d
 
 # Check logs
-docker-compose logs -f mediaarr
+docker-compose logs -f mediarr
 ```
 
 ### Step 4: Access the Interface
@@ -73,7 +73,7 @@ You should see your movies and TV shows with their current artwork status!
 
 ### Scenario 1: Unraid
 
-1. Add MediaArr via Community Applications (once published)
+1. Add Mediarr via Community Applications (once published)
 2. Or use Docker Compose mode in Unraid
 3. Map your media share paths
 4. Set PUID/PGID to match your Unraid user
@@ -82,11 +82,11 @@ You should see your movies and TV shows with their current artwork status!
 
 ```bash
 # SSH into your Synology
-cd /volume1/docker/mediaarr
+cd /volume1/docker/mediarr
 docker-compose up -d
 ```
 
-**Note**: Synology uses SMB mounts internally - MediaArr's retry logic will handle this!
+**Note**: Synology uses SMB mounts internally - Mediarr's retry logic will handle this!
 
 ### Scenario 3: Standard Linux Server
 
@@ -128,9 +128,9 @@ python app.py
    docker cp logoarr:/app/tmdb_directory_mapping.json ~/logoarr-backup.json
    ```
 
-4. **Deploy MediaArr** with same volume mounts as before
+4. **Deploy Mediarr** with same volume mounts as before
 
-5. **Verify artwork** appears correctly in MediaArr
+5. **Verify artwork** appears correctly in Mediarr
 
 6. **Remove old containers**:
    ```bash
@@ -145,15 +145,15 @@ python app.py
 - `logo.png` / `logo-thumb.png`
 - `poster.jpg` / `poster-thumb.jpg`
 
-MediaArr will detect them automatically on first scan.
+Mediarr will detect them automatically on first scan.
 
-## Updating MediaArr
+## Updating Mediarr
 
 ### Update Process
 
 ```bash
 # Pull latest changes
-cd /path/to/mediaarr
+cd /path/to/mediarr
 git pull
 
 # Rebuild and restart
@@ -188,7 +188,7 @@ This is preserved even when you rebuild the container!
 ### Performance
 
 1. **Fast Storage**: Put `./data` on SSD if possible (for mapping file I/O)
-2. **Network Mounts**: MediaArr handles SMB/NFS gracefully, but local is faster
+2. **Network Mounts**: Mediarr handles SMB/NFS gracefully, but local is faster
 3. **Memory**: 256MB RAM minimum, 512MB recommended
 
 ### Monitoring
@@ -201,7 +201,7 @@ docker-compose ps
 docker-compose logs -f --tail=100
 
 # Container stats
-docker stats mediaarr
+docker stats mediarr
 ```
 
 ### Backups
@@ -210,10 +210,10 @@ Backup these files regularly:
 
 ```bash
 # Backup mapping file
-cp data/tmdb_directory_mapping.json ~/backups/mediaarr-mapping-$(date +%Y%m%d).json
+cp data/tmdb_directory_mapping.json ~/backups/mediarr-mapping-$(date +%Y%m%d).json
 
 # Backup environment
-cp .env ~/backups/mediaarr-env-$(date +%Y%m%d).txt
+cp .env ~/backups/mediarr-env-$(date +%Y%m%d).txt
 ```
 
 ## Troubleshooting
@@ -222,7 +222,7 @@ cp .env ~/backups/mediaarr-env-$(date +%Y%m%d).txt
 
 ```bash
 # Check logs
-docker-compose logs mediaarr
+docker-compose logs mediarr
 
 # Common issues:
 # - Missing TMDB_API_KEY
@@ -234,7 +234,7 @@ docker-compose logs mediaarr
 
 ```bash
 # Check permissions
-docker-compose exec mediaarr ls -la /movies
+docker-compose exec mediarr ls -la /movies
 
 # Fix PUID/PGID in .env
 # Should match owner of media files:
@@ -250,11 +250,11 @@ ls -ln /path/to/movies | head -5
 
 ### SMB mount issues
 
-MediaArr includes retry logic, but if issues persist:
+Mediarr includes retry logic, but if issues persist:
 
 ```bash
 # Test SMB mount health
-docker-compose exec mediaarr ls -la /movies
+docker-compose exec mediarr ls -la /movies
 
 # Check for BlockingIOError in logs
 docker-compose logs | grep BlockingIOError
@@ -263,7 +263,7 @@ docker-compose logs | grep BlockingIOError
 ## Support
 
 - **Documentation**: See README.md
-- **Issues**: [GitHub Issues](https://github.com/yourusername/mediaarr/issues)
+- **Issues**: [GitHub Issues](https://github.com/anthonysnyder/Mediarr/issues)
 - **Logs**: Always include logs when reporting issues
 
 ---

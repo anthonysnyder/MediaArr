@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>{% block title %}MediaArr{% endblock %}</title>
+    <title>{% block title %}Mediarr{% endblock %}</title>
     <link rel="stylesheet" href="https://stackpath.bootstrapcdn.com/bootstrap/4.5.2/css/bootstrap.min.css">
     <link rel="stylesheet" href="{{ url_for('static', filename='css/style.css') }}">
     {% block extra_css %}{% endblock %}
@@ -12,7 +12,7 @@
 <div id="wrapper">
     <!-- Sidebar -->
     <div id="sidebar-wrapper">
-        <div class="sidebar-heading">MediaArr</div>
+        <div class="sidebar-heading">Mediarr</div>
         <div class="list-group list-group-flush">
             <a href="{{ url_for('index') }}" class="list-group-item {% if request.endpoint == 'index' %}active{% endif %}">📁 Movies</a>
             <a href="{{ url_for('tv_shows') }}" class="list-group-item {% if request.endpoint == 'tv_shows' %}active{% endif %}">📺 TV Shows</a>

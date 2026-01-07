@@ -1,5 +1,5 @@
 """
-MediaArr - Unified artwork management for movies and TV shows
+Mediarr - Unified artwork management for movies and TV shows
 Manages backdrops, logos, and posters from a single interface
 """
 
@@ -15,7 +15,7 @@ from utils.mapping_utils import mark_artwork_unavailable, is_artwork_available, 
 
 # Initialize Flask application
 app = Flask(__name__)
-app.secret_key = os.getenv('SECRET_KEY', 'mediaarr-secret-key-change-in-production')
+app.secret_key = os.getenv('SECRET_KEY', 'mediarr-secret-key-change-in-production')
 
 # Configuration from environment variables
 TMDB_API_KEY = os.getenv('TMDB_API_KEY')

@@ -1,9 +1,11 @@
+# Base image with Python (multi-architecture support is native here)
 FROM python:3.12-slim
 
-# Install system dependencies for image processing
-RUN apt-get update && apt-get install -y \
+# Install system dependencies required by Pillow (including build tools for ARM)
+RUN apt-get update && apt-get install -y --no-install-recommends \
     gcc \
-    libjpeg-dev \
+    libc6-dev \
+    libjpeg62-turbo-dev \
     zlib1g-dev \
     libfreetype6-dev \
     liblcms2-dev \
@@ -11,29 +13,20 @@ RUN apt-get update && apt-get install -y \
     libtiff-dev \
     && rm -rf /var/lib/apt/lists/*
 
-# Set working directory
+# Set the working directory inside the container
 WORKDIR /app
 
-# Install Python dependencies
-COPY requirements.txt .
+# Copy the requirements first to leverage Docker's caching mechanism for dependencies
+COPY requirements.txt /app/
+
+# Install the required Python packages
 RUN pip install --no-cache-dir -r requirements.txt
 
-# Copy application code
-COPY . .
+# Copy the rest of the app
+COPY . /app
 
-# Create data directory for mapping file
-RUN mkdir -p /app/data
-
-# Create non-root user
-RUN useradd -m -u 1000 mediaarr && chown -R mediaarr:mediaarr /app
-USER mediaarr
-
-# Expose port
+# Expose the port that Flask runs on
 EXPOSE 5000
 
-# Health check
-HEALTHCHECK --interval=30s --timeout=3s --start-period=5s --retries=3 \
-    CMD python -c "import requests; requests.get('http://localhost:5000/', timeout=2)" || exit 1
-
-# Run the application
+# Define the command to run the Flask app
 CMD ["python", "app.py"]
