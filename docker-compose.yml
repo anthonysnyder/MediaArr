@@ -2,8 +2,7 @@ version: '3.8'
 
 services:
   mediaarr:
-    build: .
-    image: mediaarr:latest
+    image: swguru2004/mediaarr:latest
     container_name: mediaarr
     restart: unless-stopped
 
