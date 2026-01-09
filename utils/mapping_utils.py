@@ -188,3 +188,38 @@ def reset_artwork_availability(tmdb_id: int, media_type: str, artwork_type: str)
                 mapping[key]['last_checked'] = datetime.now().strftime('%Y-%m-%d')
                 save_directory_mapping(mapping)
                 print(f"Reset availability for {artwork_type} on {key}")
+
+
+def get_tmdb_id_by_directory(directory_path: str) -> Optional[Dict[str, any]]:
+    """
+    Reverse lookup: find TMDb ID by directory path.
+
+    Args:
+        directory_path: Full path to directory
+
+    Returns:
+        Dictionary with 'tmdb_id' and 'media_type' if found, None otherwise
+    """
+    mapping = load_directory_mapping()
+
+    for key, value in mapping.items():
+        if isinstance(value, dict):
+            mapped_dir = value.get('directory')
+        else:
+            # Old format - just the directory string
+            mapped_dir = value
+
+        if mapped_dir == directory_path:
+            # Parse the key (format: "movie_12345" or "tv_67890")
+            parts = key.split('_', 1)
+            if len(parts) == 2:
+                media_type, tmdb_id_str = parts
+                try:
+                    return {
+                        'tmdb_id': int(tmdb_id_str),
+                        'media_type': media_type
+                    }
+                except ValueError:
+                    continue
+
+    return None

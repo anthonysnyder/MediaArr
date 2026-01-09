@@ -6,11 +6,16 @@ Manages backdrops, logos, and posters from a single interface
 import os
 import re
 from urllib.parse import unquote
-from flask import Flask, render_template, request, redirect, url_for, flash
+from flask import Flask, render_template, request, redirect, url_for, flash, jsonify
 
 from services import TMDbService, SlackService, ArtworkService
 from utils import safe_send_file
-from utils.mapping_utils import mark_artwork_unavailable, is_artwork_available, reset_artwork_availability
+from utils.mapping_utils import (
+    mark_artwork_unavailable,
+    is_artwork_available,
+    reset_artwork_availability,
+    get_tmdb_id_by_directory
+)
 
 
 # Initialize Flask application
@@ -72,34 +77,140 @@ def escapejs(value):
 
 @app.route('/')
 def index():
-    """Main page showing movie collection with all artwork types"""
-    movies, total_movies = ArtworkService.scan_media_directories(movie_folders)
-
-    # Calculate statistics
-    stats = {
-        'total': total_movies,
-        'with_backdrop': sum(1 for m in movies if m['has_backdrop']),
-        'with_logo': sum(1 for m in movies if m['has_logo']),
-        'with_poster': sum(1 for m in movies if m['has_poster']),
-    }
-
-    return render_template('index.html', movies=movies, stats=stats, media_type='movie')
+    """Main page - redirects to posters page"""
+    return redirect(url_for('posters'))
 
 
 @app.route('/tv')
 def tv_shows():
-    """TV shows page with all artwork types"""
+    """Legacy TV shows route - redirects to posters with TV filter"""
+    return redirect(url_for('posters', media_filter='tv'))
+
+
+@app.route('/posters')
+def posters():
+    """Posters page with Movies/TV filter"""
+    media_filter = request.args.get('media_filter', 'all')
+
+    # Scan both movies and TV shows
+    movies, total_movies = ArtworkService.scan_media_directories(movie_folders)
     shows, total_shows = ArtworkService.scan_media_directories(tv_folders)
 
-    # Calculate statistics
+    # Combine and filter based on media_filter
+    all_media = []
+    if media_filter in ('all', 'movies'):
+        for m in movies:
+            m['media_type'] = 'movie'
+            # Look up tmdb_id from mapping
+            tmdb_info = get_tmdb_id_by_directory(m['directory_path'])
+            m['tmdb_id'] = tmdb_info['tmdb_id'] if tmdb_info else None
+            all_media.append(m)
+    if media_filter in ('all', 'tv'):
+        for s in shows:
+            s['media_type'] = 'tv'
+            # Look up tmdb_id from mapping
+            tmdb_info = get_tmdb_id_by_directory(s['directory_path'])
+            s['tmdb_id'] = tmdb_info['tmdb_id'] if tmdb_info else None
+            all_media.append(s)
+
+    # Filter for items missing posters
+    missing = [m for m in all_media if not m['has_poster']]
+
     stats = {
-        'total': total_shows,
-        'with_backdrop': sum(1 for s in shows if s['has_backdrop']),
-        'with_logo': sum(1 for s in shows if s['has_logo']),
-        'with_poster': sum(1 for s in shows if s['has_poster']),
+        'total': len(all_media),
+        'with_artwork': sum(1 for m in all_media if m['has_poster']),
+        'missing_artwork': len(missing),
     }
 
-    return render_template('tv.html', tv_shows=shows, stats=stats, media_type='tv')
+    return render_template('artwork_page.html',
+                         media_items=all_media,
+                         artwork_type='poster',
+                         stats=stats,
+                         media_filter=media_filter)
+
+
+@app.route('/logos')
+def logos():
+    """Logos page with Movies/TV filter"""
+    media_filter = request.args.get('media_filter', 'all')
+
+    # Scan both movies and TV shows
+    movies, total_movies = ArtworkService.scan_media_directories(movie_folders)
+    shows, total_shows = ArtworkService.scan_media_directories(tv_folders)
+
+    # Combine and filter based on media_filter
+    all_media = []
+    if media_filter in ('all', 'movies'):
+        for m in movies:
+            m['media_type'] = 'movie'
+            # Look up tmdb_id from mapping
+            tmdb_info = get_tmdb_id_by_directory(m['directory_path'])
+            m['tmdb_id'] = tmdb_info['tmdb_id'] if tmdb_info else None
+            all_media.append(m)
+    if media_filter in ('all', 'tv'):
+        for s in shows:
+            s['media_type'] = 'tv'
+            # Look up tmdb_id from mapping
+            tmdb_info = get_tmdb_id_by_directory(s['directory_path'])
+            s['tmdb_id'] = tmdb_info['tmdb_id'] if tmdb_info else None
+            all_media.append(s)
+
+    # Filter for items missing logos
+    missing = [m for m in all_media if not m['has_logo']]
+
+    stats = {
+        'total': len(all_media),
+        'with_artwork': sum(1 for m in all_media if m['has_logo']),
+        'missing_artwork': len(missing),
+    }
+
+    return render_template('artwork_page.html',
+                         media_items=all_media,
+                         artwork_type='logo',
+                         stats=stats,
+                         media_filter=media_filter)
+
+
+@app.route('/backdrops')
+def backdrops():
+    """Backdrops page with Movies/TV filter"""
+    media_filter = request.args.get('media_filter', 'all')
+
+    # Scan both movies and TV shows
+    movies, total_movies = ArtworkService.scan_media_directories(movie_folders)
+    shows, total_shows = ArtworkService.scan_media_directories(tv_folders)
+
+    # Combine and filter based on media_filter
+    all_media = []
+    if media_filter in ('all', 'movies'):
+        for m in movies:
+            m['media_type'] = 'movie'
+            # Look up tmdb_id from mapping
+            tmdb_info = get_tmdb_id_by_directory(m['directory_path'])
+            m['tmdb_id'] = tmdb_info['tmdb_id'] if tmdb_info else None
+            all_media.append(m)
+    if media_filter in ('all', 'tv'):
+        for s in shows:
+            s['media_type'] = 'tv'
+            # Look up tmdb_id from mapping
+            tmdb_info = get_tmdb_id_by_directory(s['directory_path'])
+            s['tmdb_id'] = tmdb_info['tmdb_id'] if tmdb_info else None
+            all_media.append(s)
+
+    # Filter for items missing backdrops
+    missing = [m for m in all_media if not m['has_backdrop']]
+
+    stats = {
+        'total': len(all_media),
+        'with_artwork': sum(1 for m in all_media if m['has_backdrop']),
+        'missing_artwork': len(missing),
+    }
+
+    return render_template('artwork_page.html',
+                         media_items=all_media,
+                         artwork_type='backdrop',
+                         stats=stats,
+                         media_filter=media_filter)
 
 
 @app.route('/dashboard')
@@ -267,6 +378,17 @@ def recheck_artwork(media_type, tmdb_id, artwork_type):
         artwork_type=artwork_type,
         directory=directory
     ))
+
+
+@app.route('/mark_unavailable/<media_type>/<int:tmdb_id>/<artwork_type>', methods=['POST'])
+def mark_unavailable(media_type, tmdb_id, artwork_type):
+    """Mark artwork as unavailable on TMDb"""
+    try:
+        mark_artwork_unavailable(tmdb_id, media_type, artwork_type)
+        return jsonify({'success': True, 'message': f'{artwork_type} marked as unavailable'})
+    except Exception as e:
+        app.logger.exception(f"Error marking artwork as unavailable: {e}")
+        return jsonify({'success': False, 'error': str(e)}), 500
 
 
 # ============================================================================

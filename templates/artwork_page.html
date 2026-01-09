@@ -1,0 +1,202 @@
+{% extends "base.html" %}
+
+{% block title %}{{ artwork_type.capitalize() }}s - Mediarr{% endblock %}
+
+{% block content %}
+<!-- Page Header -->
+<div class="page-header">
+    <h1>{{ artwork_type.capitalize() }} Collection</h1>
+    <div class="stats-bar">
+        <div class="stat-item">
+            <strong>Total:</strong> {{ stats.total }} items
+        </div>
+        <div class="stat-item">
+            <strong>With {{ artwork_type }}:</strong> {{ stats.with_artwork }}/{{ stats.total }}
+        </div>
+        <div class="stat-item">
+            <strong>Missing {{ artwork_type }}:</strong> {{ stats.missing_artwork }}
+        </div>
+    </div>
+</div>
+
+<!-- Filter Controls -->
+<div class="filter-controls">
+    <input type="text" id="searchInput" placeholder="🔍 Filter by title...">
+
+    <div class="artwork-filter-badges">
+        <div class="filter-badge all active" data-filter="all">Show All</div>
+        <div class="filter-badge missing" data-filter="missing">Missing Only</div>
+    </div>
+
+    <button class="btn btn-custom" onclick="location.reload()">↻ Refresh</button>
+</div>
+
+<!-- Media Grid -->
+<div class="single-artwork-grid">
+    {% for item in media_items %}
+    <div class="single-artwork-card"
+         id="{{ item.clean_id }}"
+         data-title="{{ item.title | lower }}"
+         data-has-artwork="{{ item['has_' + artwork_type] | lower }}"
+         data-media-type="{{ item.media_type }}">
+
+        <!-- Artwork Display -->
+        <div class="single-artwork-display {% if artwork_type == 'poster' %}poster-aspect{% elif artwork_type == 'backdrop' %}backdrop-aspect{% else %}logo-aspect{% endif %}"
+             onclick="selectArtwork('{{ item.title | escapejs }}', '{{ item.media_type }}', '{{ artwork_type }}', '{{ item.title | escapejs }}')">
+
+            {% if artwork_type == 'backdrop' %}
+                {% if item.backdrop_thumb %}
+                    <img src="{{ item.backdrop_thumb }}" alt="{{ item.title }} Backdrop">
+                {% elif item.backdrop %}
+                    <img src="{{ item.backdrop }}" alt="{{ item.title }} Backdrop">
+                {% else %}
+                    <div class="placeholder">❌ No Backdrop<br><small>Click to add</small></div>
+                {% endif %}
+            {% elif artwork_type == 'logo' %}
+                {% if item.logo_thumb %}
+                    <img src="{{ item.logo_thumb }}" alt="{{ item.title }} Logo" class="logo-img">
+                {% elif item.logo %}
+                    <img src="{{ item.logo }}" alt="{{ item.title }} Logo" class="logo-img">
+                {% else %}
+                    <div class="placeholder">❌ No Logo<br><small>Click to add</small></div>
+                {% endif %}
+            {% elif artwork_type == 'poster' %}
+                {% if item.poster_thumb %}
+                    <img src="{{ item.poster_thumb }}" alt="{{ item.title }} Poster">
+                {% elif item.poster %}
+                    <img src="{{ item.poster }}" alt="{{ item.title }} Poster">
+                {% else %}
+                    <div class="placeholder">❌ No Poster<br><small>Click to add</small></div>
+                {% endif %}
+            {% endif %}
+
+            <div class="artwork-overlay">
+                <span>{% if item['has_' + artwork_type] %}Click to change {{ artwork_type }}{% else %}Add {{ artwork_type }}{% endif %}</span>
+            </div>
+        </div>
+
+        <!-- Card Footer -->
+        <div class="single-card-footer">
+            <div class="card-title">{{ item.title }}</div>
+            <div class="card-meta">
+                <span class="media-type-badge {{ item.media_type }}">
+                    {% if item.media_type == 'movie' %}📁 Movie{% else %}📺 TV Show{% endif %}
+                </span>
+                {% if item['has_' + artwork_type] %}
+                    <span class="has-artwork-badge">✓ Has {{ artwork_type }}</span>
+                {% else %}
+                    <span class="missing-artwork-badge">✗ Missing {{ artwork_type }}</span>
+                {% endif %}
+            </div>
+
+            <!-- Mark as Unavailable Button -->
+            {% if not item['has_' + artwork_type] %}
+            <button class="btn-mark-unavailable"
+                    onclick="event.stopPropagation(); markUnavailable('{{ item.title | escapejs }}', '{{ item.media_type }}', '{{ artwork_type }}', {{ item.get('tmdb_id', 'null') }})">
+                🚫 Mark as Unavailable
+            </button>
+            {% endif %}
+        </div>
+    </div>
+    {% endfor %}
+</div>
+{% endblock %}
+
+{% block extra_js %}
+<script>
+    // Function to trigger artwork selection search
+    function selectArtwork(title, mediaType, artworkType, directoryName) {
+        // Clean the title by removing unwanted characters
+        const cleanTitle = title
+            .replace(/\(\d{4}\)/g, '') // Remove year
+            .replace(/[^a-zA-Z0-9\s]/g, '') // Remove non-alphanumeric
+            .trim();
+
+        // Redirect to search with artwork type parameter
+        const searchUrl = `/search_${mediaType}?query=${encodeURIComponent(cleanTitle.toLowerCase())}&directory=${encodeURIComponent(directoryName)}&artwork_type=${artworkType}`;
+        window.location.href = searchUrl;
+    }
+
+    // Mark as Unavailable function
+    function markUnavailable(title, mediaType, artworkType, tmdbId) {
+        if (!tmdbId) {
+            alert('Unable to mark as unavailable - no TMDb ID found for this item.');
+            return;
+        }
+
+        if (confirm(`Mark "${title}" as having no ${artworkType} available on TMDb?\n\nThis will hide it from the "Missing Only" filter.`)) {
+            fetch(`/mark_unavailable/${mediaType}/${tmdbId}/${artworkType}`, {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json',
+                }
+            })
+            .then(response => response.json())
+            .then(data => {
+                if (data.success) {
+                    alert(`Marked as unavailable. Reloading page...`);
+                    location.reload();
+                } else {
+                    alert('Failed to mark as unavailable: ' + (data.error || 'Unknown error'));
+                }
+            })
+            .catch(error => {
+                alert('Error: ' + error);
+            });
+        }
+    }
+
+    // Filter functionality
+    document.querySelectorAll('.filter-badge').forEach(badge => {
+        badge.addEventListener('click', function() {
+            // Update active state
+            document.querySelectorAll('.filter-badge').forEach(b => b.classList.remove('active'));
+            this.classList.add('active');
+
+            const filter = this.dataset.filter;
+            const cards = document.querySelectorAll('.single-artwork-card');
+
+            cards.forEach(card => {
+                const hasArtwork = card.dataset.hasArtwork === 'true';
+
+                let show = false;
+
+                switch(filter) {
+                    case 'all':
+                        show = true;
+                        break;
+                    case 'missing':
+                        show = !hasArtwork;
+                        break;
+                }
+
+                card.style.display = show ? 'block' : 'none';
+            });
+        });
+    });
+
+    // Search functionality
+    document.getElementById('searchInput').addEventListener('keyup', function() {
+        const query = this.value.toLowerCase();
+        const cards = document.querySelectorAll('.single-artwork-card');
+
+        cards.forEach(card => {
+            const title = card.dataset.title;
+            card.style.display = title.includes(query) ? 'block' : 'none';
+        });
+    });
+
+    // Scroll to anchor on page load
+    window.addEventListener('load', function() {
+        if (window.location.hash) {
+            const targetId = window.location.hash.substring(1);
+            const targetElement = document.getElementById(targetId);
+            if (targetElement) {
+                setTimeout(function() {
+                    targetElement.scrollIntoView({ behavior: 'smooth', block: 'center' });
+                }, 100);
+            }
+        }
+    });
+</script>
+{% endblock %}

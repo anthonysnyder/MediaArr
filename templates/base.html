@@ -13,9 +13,23 @@
     <!-- Sidebar -->
     <div id="sidebar-wrapper">
         <div class="sidebar-heading">Mediarr</div>
+
+        <!-- Top Navigation Tabs for Artwork Types -->
+        <div class="artwork-tabs">
+            <a href="{{ url_for('posters') }}" class="tab-item {% if request.endpoint == 'posters' %}active{% endif %}">🎭 Posters</a>
+            <a href="{{ url_for('logos') }}" class="tab-item {% if request.endpoint == 'logos' %}active{% endif %}">🏷️ Logos</a>
+            <a href="{{ url_for('backdrops') }}" class="tab-item {% if request.endpoint == 'backdrops' %}active{% endif %}">🎬 Backdrops</a>
+        </div>
+
+        <!-- Media Type Sidebar Filter -->
         <div class="list-group list-group-flush">
-            <a href="{{ url_for('index') }}" class="list-group-item {% if request.endpoint == 'index' %}active{% endif %}">📁 Movies</a>
-            <a href="{{ url_for('tv_shows') }}" class="list-group-item {% if request.endpoint == 'tv_shows' %}active{% endif %}">📺 TV Shows</a>
+            <a href="{{ url_for(request.endpoint or 'posters', media_filter='movies') }}"
+               class="list-group-item {% if request.args.get('media_filter') == 'movies' %}active{% endif %}">📁 Movies</a>
+            <a href="{{ url_for(request.endpoint or 'posters', media_filter='tv') }}"
+               class="list-group-item {% if request.args.get('media_filter') == 'tv' %}active{% endif %}">📺 TV Shows</a>
+            <a href="{{ url_for(request.endpoint or 'posters', media_filter='all') }}"
+               class="list-group-item {% if request.args.get('media_filter', 'all') == 'all' %}active{% endif %}">🌐 All Media</a>
+            <div class="sidebar-divider"></div>
             <a href="{{ url_for('dashboard') }}" class="list-group-item {% if request.endpoint == 'dashboard' %}active{% endif %}">📊 Dashboard</a>
         </div>
     </div>
