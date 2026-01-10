@@ -90,22 +90,22 @@ def tv_shows():
 @app.route('/posters')
 def posters():
     """Posters page with Movies/TV filter"""
-    media_filter = request.args.get('media_filter', 'all')
+    media_filter = request.args.get('media_filter', 'movies')
 
-    # Scan both movies and TV shows
-    movies, total_movies = ArtworkService.scan_media_directories(movie_folders)
-    shows, total_shows = ArtworkService.scan_media_directories(tv_folders)
-
-    # Combine and filter based on media_filter
+    # Only scan what's needed based on filter
     all_media = []
+
     if media_filter in ('all', 'movies'):
+        movies, _ = ArtworkService.scan_media_directories(movie_folders)
         for m in movies:
             m['media_type'] = 'movie'
             # Look up tmdb_id from mapping
             tmdb_info = get_tmdb_id_by_directory(m['directory_path'])
             m['tmdb_id'] = tmdb_info['tmdb_id'] if tmdb_info else None
             all_media.append(m)
+
     if media_filter in ('all', 'tv'):
+        shows, _ = ArtworkService.scan_media_directories(tv_folders)
         for s in shows:
             s['media_type'] = 'tv'
             # Look up tmdb_id from mapping
@@ -132,22 +132,22 @@ def posters():
 @app.route('/logos')
 def logos():
     """Logos page with Movies/TV filter"""
-    media_filter = request.args.get('media_filter', 'all')
+    media_filter = request.args.get('media_filter', 'movies')
 
-    # Scan both movies and TV shows
-    movies, total_movies = ArtworkService.scan_media_directories(movie_folders)
-    shows, total_shows = ArtworkService.scan_media_directories(tv_folders)
-
-    # Combine and filter based on media_filter
+    # Only scan what's needed based on filter
     all_media = []
+
     if media_filter in ('all', 'movies'):
+        movies, _ = ArtworkService.scan_media_directories(movie_folders)
         for m in movies:
             m['media_type'] = 'movie'
             # Look up tmdb_id from mapping
             tmdb_info = get_tmdb_id_by_directory(m['directory_path'])
             m['tmdb_id'] = tmdb_info['tmdb_id'] if tmdb_info else None
             all_media.append(m)
+
     if media_filter in ('all', 'tv'):
+        shows, _ = ArtworkService.scan_media_directories(tv_folders)
         for s in shows:
             s['media_type'] = 'tv'
             # Look up tmdb_id from mapping
@@ -174,22 +174,22 @@ def logos():
 @app.route('/backdrops')
 def backdrops():
     """Backdrops page with Movies/TV filter"""
-    media_filter = request.args.get('media_filter', 'all')
+    media_filter = request.args.get('media_filter', 'movies')
 
-    # Scan both movies and TV shows
-    movies, total_movies = ArtworkService.scan_media_directories(movie_folders)
-    shows, total_shows = ArtworkService.scan_media_directories(tv_folders)
-
-    # Combine and filter based on media_filter
+    # Only scan what's needed based on filter
     all_media = []
+
     if media_filter in ('all', 'movies'):
+        movies, _ = ArtworkService.scan_media_directories(movie_folders)
         for m in movies:
             m['media_type'] = 'movie'
             # Look up tmdb_id from mapping
             tmdb_info = get_tmdb_id_by_directory(m['directory_path'])
             m['tmdb_id'] = tmdb_info['tmdb_id'] if tmdb_info else None
             all_media.append(m)
+
     if media_filter in ('all', 'tv'):
+        shows, _ = ArtworkService.scan_media_directories(tv_folders)
         for s in shows:
             s['media_type'] = 'tv'
             # Look up tmdb_id from mapping
