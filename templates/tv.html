@@ -1,184 +1,152 @@
-{% extends "base.html" %}
-
-{% block title %}TV Shows - Mediarr{% endblock %}
-
-{% block content %}
-<!-- Page Header -->
-<div class="page-header">
-    <h1>TV Show Collection</h1>
-    <div class="stats-bar">
-        <div class="stat-item">
-            <strong>Total:</strong> {{ stats.total }} shows
-        </div>
-        <div class="stat-item">
-            <strong>Backdrops:</strong> {{ stats.with_backdrop }}/{{ stats.total }}
-        </div>
-        <div class="stat-item">
-            <strong>Logos:</strong> {{ stats.with_logo }}/{{ stats.total }}
-        </div>
-        <div class="stat-item">
-            <strong>Posters:</strong> {{ stats.with_poster }}/{{ stats.total }}
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>My TV Show Collection</title>
+    <link rel="stylesheet" href="https://stackpath.bootstrapcdn.com/bootstrap/4.5.2/css/bootstrap.min.css">
+    <style>
+        body {
+            background-color: #343a40;
+            color: #fff;
+        }
+        #wrapper {
+            display: flex;
+            width: 100%;
+        }
+        #sidebar-wrapper {
+            width: 250px;
+            background-color: #212529;
+            border-right: 1px solid #444;
+        }
+        .sidebar-heading {
+            padding: 1rem;
+            font-size: 1.5rem;
+            background-color: #1d2124;
+            text-align: center;
+        }
+        .list-group-item {
+            background-color: #212529;
+            color: #fff;
+            border: none;
+        }
+        .list-group-item:hover {
+            background-color: #343a40;
+        }
+        #page-content-wrapper {
+            flex-grow: 1;
+            padding: 20px;
+        }
+        .movie-grid {
+            display: flex;
+            flex-wrap: wrap;
+        }
+        .movie-card {
+            flex: 0 0 16.66%;
+            max-width: 16.66%;
+            padding: 10px;
+            box-sizing: border-box;
+        }
+        .movie-card img {
+            width: 100%;
+            height: auto;
+            object-fit: cover;
+            border-radius: 8px;
+        }
+        .movie-card h5 {
+            font-size: 1rem;
+            margin-top: 10px;
+            text-align: center;
+            cursor: pointer;
+        }
+    </style>
+</head>
+<body>
+<div id="wrapper">
+    <div class="bg-dark border-right" id="sidebar-wrapper">
+        <div class="sidebar-heading">My Media Collection</div>
+        <div class="list-group list-group-flush">
+            <button class="list-group-item list-group-item-action" onclick="window.location.assign('/')">Movies</button>
+            <button class="list-group-item list-group-item-action" onclick="location.href='/tv'">TV Shows</button>
         </div>
     </div>
-</div>
 
-<!-- Filter Controls -->
-<div class="filter-controls">
-    <input type="text" id="searchInput" placeholder="🔍 Filter TV shows by title...">
+    <div id="page-content-wrapper">
+        <div class="container-fluid">
+            <h1 class="my-4">TV Show Collection</h1>
 
-    <div class="artwork-filter-badges">
-        <div class="filter-badge all active" data-filter="all">All</div>
-        <div class="filter-badge backdrop" data-filter="backdrop">🎬 Missing Backdrop</div>
-        <div class="filter-badge logo" data-filter="logo">🏷️ Missing Logo</div>
-        <div class="filter-badge poster" data-filter="poster">🎭 Missing Poster</div>
-    </div>
-
-    <button class="btn btn-custom" onclick="location.href='{{ url_for('refresh') }}'">↻ Refresh</button>
-</div>
-
-<!-- Media Grid -->
-<div class="media-grid">
-    {% for show in tv_shows %}
-    <div class="media-card" id="{{ show.clean_id }}"
-         data-title="{{ show.title | lower }}"
-         data-has-backdrop="{{ show.has_backdrop | lower }}"
-         data-has-logo="{{ show.has_logo | lower }}"
-         data-has-poster="{{ show.has_poster | lower }}">
-
-        <!-- Backdrop Section -->
-        <div class="backdrop-section" onclick="selectArtwork('{{ show.title | escapejs }}', 'tv', 'backdrop', '{{ show.title | escapejs }}')">
-            {% if show.backdrop_thumb %}
-                <img src="{{ show.backdrop_thumb }}" alt="{{ show.title }} Backdrop">
-            {% elif show.backdrop %}
-                <img src="{{ show.backdrop }}" alt="{{ show.title }} Backdrop">
-            {% else %}
-                <div class="placeholder">❌ No Backdrop<br><small>Click to add</small></div>
-            {% endif %}
-            <div class="artwork-overlay">
-                <span>{% if show.has_backdrop %}Click to change backdrop{% else %}Add backdrop{% endif %}</span>
+            <input type="text" id="searchInput" placeholder="Filter TV Shows..." class="form-control">
+            <div class="btn-group mt-2 mb-4" role="group">
+                <button class="btn btn-primary" onclick="filterTVShowsWithoutBackdrop()">Show TV Shows Without Backdrop</button>
+                <button onclick="location.href='/refresh'" class="btn btn-secondary">Refresh</button>
             </div>
-        </div>
 
-        <!-- Bottom Row: Logo + Poster -->
-        <div class="bottom-row">
-            <div class="logo-section" onclick="selectArtwork('{{ show.title | escapejs }}', 'tv', 'logo', '{{ show.title | escapejs }}')">
-                {% if show.logo_thumb %}
-                    <img src="{{ show.logo_thumb }}" alt="{{ show.title }} Logo">
-                {% elif show.logo %}
-                    <img src="{{ show.logo }}" alt="{{ show.title }} Logo">
-                {% else %}
-                    <div class="placeholder">❌ No Logo<br><small>Click to add</small></div>
-                {% endif %}
-                <div class="artwork-overlay">
-                    <span>{% if show.has_logo %}Change logo{% else %}Add logo{% endif %}</span>
+            <div id="tvList" class="movie-grid">
+                {% for tv_show in tv_shows %}
+                <div class="movie-card" id="{{ tv_show.clean_id }}" data-title="{{ tv_show.title | lower }}" data-has-backdrop="{{ tv_show.has_backdrop | lower }}">
+                    <div>
+                        {% if tv_show.backdrop_thumb %}
+                        <img src="{{ tv_show.backdrop_thumb }}" alt="{{ tv_show.title }}" onclick="triggerSearch('{{ tv_show.title }}', 'tv', '{{ tv_show.title }}')">
+                        {% elif tv_show.backdrop %}
+                        <img src="{{ tv_show.backdrop }}" alt="{{ tv_show.title }}" onclick="triggerSearch('{{ tv_show.title }}', 'tv', '{{ tv_show.title }}')">
+                        {% else %}
+                        <div class="img-thumbnail bg-light d-flex align-items-center justify-content-center" style="height: 300px;">
+                            <span>No Backdrop</span>
+                        </div>
+                        {% endif %}
+                    </div>
+                    <h5 class="mt-2 text-center" onclick="triggerSearch(`{{ tv_show.title }}`, 'tv', `{{ tv_show.title }}`)">{{ tv_show.title }}</h5>
+                    <p class="text-center">
+                        <strong>Dimensions:</strong> {{ tv_show.backdrop_dimensions }} | 
+                        <strong>Last Modified:</strong> {{ tv_show.backdrop_last_modified }}
+                    </p>
                 </div>
-            </div>
-
-            <div class="poster-section" onclick="selectArtwork('{{ show.title | escapejs }}', 'tv', 'poster', '{{ show.title | escapejs }}')">
-                {% if show.poster_thumb %}
-                    <img src="{{ show.poster_thumb }}" alt="{{ show.title }} Poster">
-                {% elif show.poster %}
-                    <img src="{{ show.poster }}" alt="{{ show.title }} Poster">
-                {% else %}
-                    <div class="placeholder">❌ No Poster<br><small>Click to add</small></div>
-                {% endif %}
-                <div class="artwork-overlay">
-                    <span>{% if show.has_poster %}Change poster{% else %}Add poster{% endif %}</span>
-                </div>
-            </div>
-        </div>
-
-        <!-- Card Footer -->
-        <div class="card-footer-info">
-            <div class="card-title">{{ show.title }}</div>
-            <div class="artwork-status">
-                <span class="status-badge {% if show.has_backdrop %}has-backdrop{% else %}no-backdrop{% endif %}">
-                    {% if show.has_backdrop %}BACKDROP{% else %}NO BACKDROP{% endif %}
-                </span>
-                <span class="status-badge {% if show.has_logo %}has-logo{% else %}no-logo{% endif %}">
-                    {% if show.has_logo %}LOGO{% else %}NO LOGO{% endif %}
-                </span>
-                <span class="status-badge {% if show.has_poster %}has-poster{% else %}no-poster{% endif %}">
-                    {% if show.has_poster %}POSTER{% else %}NO POSTER{% endif %}
-                </span>
+                {% endfor %}
             </div>
         </div>
     </div>
-    {% endfor %}
 </div>
-{% endblock %}
 
-{% block extra_js %}
+<!-- JavaScript Section -->
 <script>
-    // Function to trigger artwork selection search
-    function selectArtwork(title, mediaType, artworkType, directoryName) {
+    // Function to trigger search
+    function triggerSearch(title, contentType, directoryName) {
+        // Clean title by removing year and special characters
         const cleanTitle = title
-            .replace(/\(\d{4}\)/g, '')
-            .replace(/[^a-zA-Z0-9\s]/g, '')
-            .trim();
+            .replace(/\(\d{4}\)/g, '') // Remove the year in parentheses
+            .replace(/[^a-zA-Z0-9\s]/g, '') // Remove all non-alphanumeric characters except spaces
+            .trim(); // Trim leading/trailing spaces
 
-        const searchUrl = `/search_${mediaType}?query=${encodeURIComponent(cleanTitle.toLowerCase())}&directory=${encodeURIComponent(directoryName)}&artwork_type=${artworkType}`;
-        window.location.href = searchUrl;
+        // Redirect with sanitized title AND the directory name
+        window.location.href = `/search_${contentType}?query=${encodeURIComponent(cleanTitle.toLowerCase())}&directory=${encodeURIComponent(directoryName)}`;
     }
 
-    // Filter functionality
-    document.querySelectorAll('.filter-badge').forEach(badge => {
-        badge.addEventListener('click', function() {
-            document.querySelectorAll('.filter-badge').forEach(b => b.classList.remove('active'));
-            this.classList.add('active');
+    document.getElementById('searchInput').addEventListener('input', function () {
+        let filter = this.value.toLowerCase();
+        let items = document.querySelectorAll('.movie-card');
 
-            const filter = this.dataset.filter;
-            const cards = document.querySelectorAll('.media-card');
-
-            cards.forEach(card => {
-                const hasBackdrop = card.dataset.hasBackdrop === 'true';
-                const hasLogo = card.dataset.hasLogo === 'true';
-                const hasPoster = card.dataset.hasPoster === 'true';
-
-                let show = false;
-
-                switch(filter) {
-                    case 'all':
-                        show = true;
-                        break;
-                    case 'backdrop':
-                        show = !hasBackdrop;
-                        break;
-                    case 'logo':
-                        show = !hasLogo;
-                        break;
-                    case 'poster':
-                        show = !hasPoster;
-                        break;
-                }
-
-                card.style.display = show ? 'block' : 'none';
-            });
-        });
-    });
-
-    // Search functionality
-    document.getElementById('searchInput').addEventListener('keyup', function() {
-        const query = this.value.toLowerCase();
-        const cards = document.querySelectorAll('.media-card');
-
-        cards.forEach(card => {
-            const title = card.dataset.title;
-            card.style.display = title.includes(query) ? 'block' : 'none';
-        });
-    });
-
-    // Scroll to anchor on page load
-    window.addEventListener('load', function() {
-        if (window.location.hash) {
-            const targetId = window.location.hash.substring(1);
-            const targetElement = document.getElementById(targetId);
-            if (targetElement) {
-                setTimeout(function() {
-                    targetElement.scrollIntoView({ behavior: 'smooth', block: 'center' });
-                }, 100);
+        items.forEach(item => {
+            let title = item.getAttribute('data-title');
+            if (title.includes(filter)) {
+                item.style.display = '';
+            } else {
+                item.style.display = 'none';
             }
-        }
+        });
     });
+
+    function filterTVShowsWithoutBackdrop() {
+        let items = document.querySelectorAll('.movie-card');
+        items.forEach(item => {
+            let hasBackdrop = item.getAttribute('data-has-backdrop');
+            if (hasBackdrop === 'false') {
+                item.style.display = '';
+            } else {
+                item.style.display = 'none';
+            }
+        });
+    }
 </script>
-{% endblock %}
+
+</body>
+</html>

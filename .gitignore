@@ -4,9 +4,6 @@ __pycache__/
 *$py.class
 *.so
 .Python
-env/
-venv/
-ENV/
 build/
 develop-eggs/
 dist/
@@ -23,13 +20,14 @@ wheels/
 .installed.cfg
 *.egg
 
+# Virtual Environment
+venv/
+ENV/
+env/
+
 # Flask
 instance/
 .webassets-cache
-
-# Environment
-.env
-.env.local
 
 # IDE
 .vscode/
@@ -38,12 +36,36 @@ instance/
 *.swo
 *~
 
-# Data
-data/tmdb_directory_mapping.json
-
 # OS
 .DS_Store
 Thumbs.db
 
+# Environment variables
+.env
+.env.local
+
+# Test directories
+/tmp/
+test_data/
+
 # Logs
 *.log
+
+# Docker
+docker-compose.override.yml
+
+# TMDb directory mapping file (contains local paths)
+tmdb_directory_mapping.json
+
+# Test folders
+test_media/
+
+# Local cache and data
+artwork_cache/
+unavailable_artwork.json
+
+# LaunchAgent plist with API keys
+com.mediarr.app.plist
+
+# Mockup files
+mockup-*.html

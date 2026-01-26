@@ -1,59 +1,326 @@
-{% extends "base.html" %}
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Select {{ artwork_config.name }} - {{ media_title }}</title>
+    <link rel="stylesheet" href="https://stackpath.bootstrapcdn.com/bootstrap/4.5.2/css/bootstrap.min.css">
+    <style>
+        body {
+            background-color: #343a40;
+            color: #fff;
+        }
+        .header {
+            background-color: #212529;
+            padding: 1.5rem;
+            border-bottom: 2px solid #007bff;
+            margin-bottom: 2rem;
+        }
+        .back-button {
+            background-color: #6c757d;
+            color: white;
+            border: none;
+            padding: 0.5rem 1rem;
+            border-radius: 4px;
+            cursor: pointer;
+            text-decoration: none;
+            display: inline-block;
+            margin-bottom: 1rem;
+        }
+        .back-button:hover {
+            background-color: #5a6268;
+            color: white;
+            text-decoration: none;
+        }
+        .artwork-info {
+            background-color: #1d2124;
+            padding: 1rem;
+            border-radius: 8px;
+            margin-bottom: 2rem;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+        }
+        .filter-bar {
+            background-color: #212529;
+            padding: 1rem;
+            border-radius: 8px;
+            margin-bottom: 2rem;
+            display: flex;
+            gap: 1rem;
+            align-items: center;
+        }
+        .filter-bar select {
+            background-color: #343a40;
+            color: white;
+            border: 1px solid #495057;
+            padding: 0.5rem;
+            border-radius: 4px;
+        }
+        .artwork-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fill, minmax(250px, 1fr));
+            gap: 1.5rem;
+        }
+        .artwork-card {
+            background-color: #212529;
+            border-radius: 8px;
+            overflow: hidden;
+            cursor: pointer;
+            transition: transform 0.2s, box-shadow 0.2s;
+            border: 3px solid transparent;
+            position: relative;
+        }
+        .artwork-card:hover {
+            transform: translateY(-4px);
+            box-shadow: 0 6px 16px rgba(0, 123, 255, 0.4);
+            border-color: #007bff;
+        }
+        .artwork-card.downloading {
+            border-color: #28a745;
+            box-shadow: 0 6px 16px rgba(40, 167, 69, 0.4);
+        }
+        .artwork-image-container {
+            position: relative;
+            width: 100%;
+            {% if artwork_type == 'poster' %}
+            padding-top: 150%; /* 2:3 aspect ratio for posters */
+            {% elif artwork_type == 'backdrop' %}
+            padding-top: 56.25%; /* 16:9 aspect ratio for backdrops */
+            {% else %}
+            padding-top: 50%; /* Generic aspect ratio for logos */
+            {% endif %}
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            display: flex;
+            align-items: center;
+            justify-content: center;
+        }
+        .artwork-image {
+            position: absolute;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            object-fit: cover;
+        }
+        .artwork-badge {
+            position: absolute;
+            top: 10px;
+            right: 10px;
+            background-color: rgba(40, 167, 69, 0.95);
+            color: white;
+            padding: 0.3rem 0.6rem;
+            border-radius: 4px;
+            font-size: 0.75rem;
+            font-weight: bold;
+        }
+        .downloading-badge {
+            background-color: rgba(0, 123, 255, 0.95) !important;
+        }
+        .artwork-info-section {
+            padding: 1rem;
+        }
+        .artwork-dimensions {
+            font-size: 0.85rem;
+            color: #adb5bd;
+            margin-bottom: 0.5rem;
+        }
+        .artwork-quality {
+            display: inline-block;
+            padding: 0.25rem 0.5rem;
+            border-radius: 4px;
+            font-size: 0.75rem;
+            font-weight: bold;
+        }
+        .quality-high {
+            background-color: #28a745;
+            color: white;
+        }
+        .quality-medium {
+            background-color: #ffc107;
+            color: #212529;
+        }
+        .quality-low {
+            background-color: #dc3545;
+            color: white;
+        }
+        .artwork-meta {
+            margin-top: 0.5rem;
+            font-size: 0.75rem;
+            color: #6c757d;
+        }
+        .language-badge {
+            display: inline-block;
+            padding: 0.2rem 0.4rem;
+            background-color: #007bff;
+            color: white;
+            border-radius: 3px;
+            font-size: 0.7rem;
+            margin-left: 0.5rem;
+        }
+    </style>
+</head>
+<body>
+    <div class="container-fluid" style="max-width: 1600px; padding: 2rem;">
+        <a href="#" class="back-button" onclick="history.back(); return false;">← Back to Search Results</a>
 
-{% block title %}Select {{ artwork_type.capitalize() }} - Mediarr{% endblock %}
-
-{% block content %}
-<div class="page-header">
-    <h1>Select {{ artwork_type.capitalize() }} for "{{ media_title }}"</h1>
-    <p class="text-muted">{{ media_type.capitalize() }} • {{ artworks | length }} {{ artwork_type }}(s) available</p>
-</div>
-
-{% if artworks %}
-    <div class="row">
-        {% for artwork in artworks %}
-        <div class="col-md-{% if artwork_type == 'poster' %}2{% elif artwork_type == 'logo' %}3{% else %}4{% endif %} mb-4">
-            <div class="card" style="background: linear-gradient(145deg, #2a2d31 0%, #1f2124 100%); border: 1px solid #333; border-radius: 8px;">
-                <img src="{{ artwork.url }}" class="card-img-top" alt="{{ artwork_type.capitalize() }}" style="width: 100%; height: auto; border-top-left-radius: 8px; border-top-right-radius: 8px;">
-                <div class="card-body" style="padding: 1rem; background-color: #1f2124;">
-                    <div style="margin-bottom: 0.75rem; min-height: 40px;">
-                        <div style="font-size: 0.8rem; color: #adb5bd; margin-bottom: 0.25rem;">
-                            <strong style="color: #fff;">Size:</strong> {{ artwork.size }}
-                        </div>
-                        <div style="font-size: 0.8rem; color: #adb5bd;">
-                            <strong style="color: #fff;">Lang:</strong> {{ artwork.language }}
-                        </div>
-                    </div>
-                    <form method="POST" action="{{ url_for('download_artwork') }}">
-                        <input type="hidden" name="artwork_url" value="{{ artwork.url }}">
-                        <input type="hidden" name="artwork_type" value="{{ artwork_type }}">
-                        <input type="hidden" name="media_title" value="{{ media_title }}">
-                        <input type="hidden" name="media_type" value="{{ media_type }}">
-                        <input type="hidden" name="tmdb_id" value="{{ tmdb_id }}">
-                        <input type="hidden" name="directory" value="{{ directory }}">
-                        <button type="submit" class="btn btn-custom btn-block">Download</button>
-                    </form>
+        <div class="header">
+            <h1>Select {{ artwork_config.name }} for Download</h1>
+            <div class="artwork-info">
+                <div>
+                    <strong style="font-size: 1.3rem;">{{ media_title }}</strong>
+                    <span style="color: #adb5bd; margin-left: 1rem;">TMDb ID: {{ tmdb_id }}</span>
+                </div>
+                <div>
+                    <span style="color: #28a745; font-weight: bold;">{{ artwork|length }} {{ artwork_config.name|lower }} available</span>
                 </div>
             </div>
         </div>
-        {% endfor %}
-    </div>
-{% else %}
-    <div class="alert alert-warning">
-        <h4>No {{ artwork_type }}s available on TMDb</h4>
-        <p>TMDb doesn't have any {{ artwork_type }}s for "{{ media_title }}".</p>
-        <div class="mt-3">
-            <a href="{{ url_for('recheck_artwork', media_type=media_type, tmdb_id=tmdb_id, artwork_type=artwork_type, directory=directory) }}"
-               class="btn btn-custom">
-                ↻ Recheck TMDb
-            </a>
-            <a href="{{ url_for('index' if media_type == 'movie' else 'tv_shows') }}" class="btn btn-secondary">
-                ← Back to Collection
-            </a>
-        </div>
-    </div>
-{% endif %}
 
-<div class="mt-4">
-    <a href="{{ url_for('index' if media_type == 'movie' else 'tv_shows') }}" class="btn btn-secondary">← Back to Collection</a>
-</div>
-{% endblock %}
+        {% if artwork_config.filter_language %}
+        <div class="filter-bar">
+            <label style="color: #adb5bd; margin-right: 0.5rem;">Filter by:</label>
+            <select id="languageFilter" onchange="filterArtwork()">
+                <option value="all">All Languages</option>
+                <option value="en">English</option>
+                <option value="none">No Language</option>
+            </select>
+            <select id="qualityFilter" onchange="filterArtwork()">
+                <option value="all">All Qualities</option>
+                <option value="high">High Quality (≥2000px)</option>
+                <option value="medium">Medium Quality (1000-1999px)</option>
+                <option value="low">Low Quality (&lt;1000px)</option>
+            </select>
+            <select id="sortOrder" onchange="filterArtwork()">
+                <option value="popular">Sort by Popularity</option>
+                <option value="size">Sort by Size (Largest)</option>
+                <option value="rating">Sort by Rating</option>
+            </select>
+        </div>
+        {% endif %}
+
+        <div class="artwork-grid" id="artworkGrid">
+            {% for item in artwork %}
+            <div class="artwork-card"
+                 data-language="{{ item.language or 'none' }}"
+                 data-width="{{ item.size.split('x')[0] }}"
+                 data-height="{{ item.size.split('x')[1] }}"
+                 data-rating="0"
+                 onclick="downloadArtwork(this, '{{ item.url }}')">
+                <div class="artwork-image-container">
+                    <img class="artwork-image" src="{{ item.url }}" alt="{{ artwork_config.name }}">
+                </div>
+                <div class="artwork-info-section">
+                    <div class="artwork-dimensions">
+                        <strong>{{ item.size }}</strong>
+                        {% if item.language and item.language != 'N/A' %}
+                        <span class="language-badge">{{ item.language|upper }}</span>
+                        {% else %}
+                        <span class="language-badge" style="background-color: #6c757d;">None</span>
+                        {% endif %}
+                    </div>
+                    {% set width = item.size.split('x')[0]|int %}
+                    {% set height = item.size.split('x')[1]|int %}
+                    {% set max_dimension = [width, height]|max %}
+                    {% if max_dimension >= 2000 %}
+                    <span class="artwork-quality quality-high">HIGH QUALITY</span>
+                    {% elif max_dimension >= 1000 %}
+                    <span class="artwork-quality quality-medium">MEDIUM QUALITY</span>
+                    {% else %}
+                    <span class="artwork-quality quality-low">LOW QUALITY ⚠️</span>
+                    {% endif %}
+                </div>
+            </div>
+            {% endfor %}
+        </div>
+
+    </div>
+
+    <script>
+        function downloadArtwork(card, artworkUrl) {
+            // Add downloading class for visual feedback
+            card.classList.add('downloading');
+
+            // Add downloading badge
+            const badge = document.createElement('div');
+            badge.className = 'artwork-badge downloading-badge';
+            badge.textContent = '⬇ DOWNLOADING';
+            card.querySelector('.artwork-image-container').appendChild(badge);
+
+            // Create a form and submit it to download the artwork
+            const form = document.createElement('form');
+            form.method = 'POST';
+            form.action = '{{ url_for("select_artwork") }}';
+
+            const fields = {
+                'artwork_url': artworkUrl,
+                'media_title': '{{ media_title }}',
+                'media_type': '{{ content_type }}',
+                'artwork_type': '{{ artwork_type }}'
+            };
+
+            for (const [key, value] of Object.entries(fields)) {
+                const input = document.createElement('input');
+                input.type = 'hidden';
+                input.name = key;
+                input.value = value;
+                form.appendChild(input);
+            }
+
+            document.body.appendChild(form);
+            form.submit();
+        }
+
+        function filterArtwork() {
+            const languageFilter = document.getElementById('languageFilter')?.value || 'all';
+            const qualityFilter = document.getElementById('qualityFilter')?.value || 'all';
+            const sortOrder = document.getElementById('sortOrder')?.value || 'popular';
+
+            const cards = Array.from(document.querySelectorAll('.artwork-card'));
+
+            // Filter cards
+            cards.forEach(card => {
+                let show = true;
+
+                // Language filter
+                const lang = card.dataset.language;
+                if (languageFilter !== 'all') {
+                    if (languageFilter === 'none' && lang !== 'none') show = false;
+                    if (languageFilter !== 'none' && lang !== languageFilter) show = false;
+                }
+
+                // Quality filter
+                const width = parseInt(card.dataset.width);
+                const height = parseInt(card.dataset.height);
+                const maxDim = Math.max(width, height);
+                if (qualityFilter === 'high' && maxDim < 2000) show = false;
+                if (qualityFilter === 'medium' && (maxDim < 1000 || maxDim >= 2000)) show = false;
+                if (qualityFilter === 'low' && maxDim >= 1000) show = false;
+
+                card.style.display = show ? '' : 'none';
+            });
+
+            // Sort visible cards
+            const visibleCards = cards.filter(card => card.style.display !== 'none');
+            const grid = document.getElementById('artworkGrid');
+
+            if (sortOrder === 'size') {
+                visibleCards.sort((a, b) => {
+                    const aSize = parseInt(a.dataset.width) * parseInt(a.dataset.height);
+                    const bSize = parseInt(b.dataset.width) * parseInt(b.dataset.height);
+                    return bSize - aSize;
+                });
+            } else if (sortOrder === 'rating') {
+                visibleCards.sort((a, b) => {
+                    return parseFloat(b.dataset.rating) - parseFloat(a.dataset.rating);
+                });
+            }
+
+            // Re-append in sorted order
+            if (sortOrder !== 'popular') {
+                visibleCards.forEach(card => grid.appendChild(card));
+            }
+        }
+    </script>
+</body>
+</html>

@@ -1,303 +1,240 @@
 # Mediarr
 
-**Unified artwork management for your media library**
+**Mediarr** is a unified Flask application designed to organize, manage, and download high-quality **posters**, **logos**, and **backdrops** for movies and TV shows. It provides an intuitive interface to manage all your media artwork in one place, with intelligent tracking of what's available, what's missing, and what's unavailable on TMDb.
 
-Mediarr is a web application that manages backdrops, logos, and posters for your movie and TV show collection from a single, beautiful interface. No more juggling three separate tools - see all your artwork status at a glance and fill in the gaps with ease.
+Originally built as "Backgroundarr" for managing backdrops in advance of [Plex releasing their next version](https://www.plex.tv/blog/new-year-same-mission/) which highlights backdrop images more prominently, Mediarr has evolved into a comprehensive artwork management solution.
 
-![Mediarr Interface](https://via.placeholder.com/800x400?text=Mediarr+Screenshot)
+## 🎨 Key Features
 
-## Features
+- **Unified Artwork Management**: Handle posters, logos, and backdrops in a single interface
+- **Three-State Status Tracking**:
+  - 🟢 **Green**: Artwork found and saved
+  - 🟡 **Yellow**: Artwork missing (click to mark as unavailable)
+  - 🔴 **Red**: Artwork unavailable on TMDb
+- **Smart Unavailability Tracking**: Persist artwork availability across sessions
+- **Progress Bars**: Visual completion percentage for each artwork type
+- **Advanced Filtering**: Filter by missing artwork and minimum dimensions
+- **Click-to-Download**: Select artwork and download immediately without confirmation
+- **Quality Indicators**: See at a glance if artwork is high, medium, or low quality
+- **Language Filtering**: Filter posters by language when selecting
+- **SMB/NAS Safe**: Optimized for network mounts with retry logic
+- **Slack Notifications**: Get notified when artwork is downloaded
+- **Auto-Generated Thumbnails**: Fast-loading preview images
 
-✨ **Unified Interface** - Manage backdrops, logos, and posters in one place
-🎨 **Beautiful UI** - Modern, responsive design with dark theme
-🔍 **Smart Matching** - Three-tier directory matching (UI hint → cached mapping → fuzzy match)
-💾 **Persistent State** - Remembers TMDb artwork availability across container restarts
-🖼️ **Auto Thumbnails** - Generates optimized thumbnails for fast loading
-📁 **SMB-Safe** - Handles network mounts gracefully with retry logic
-📊 **Stats Dashboard** - Track your artwork collection completeness
-🔔 **Slack Notifications** - Get notified when artwork is downloaded
-🎯 **Filtered Views** - Quickly find items missing specific artwork types
+## 📸 Screenshots
 
-## Screenshots
+### Main Collection View
+![Collection view showing all three artwork types per movie with color-coded status indicators]
 
-### Unified Card View
-Each media item shows all three artwork types in one card:
-- **Backdrop** (16:9) - Full width at top
-- **Logo** (transparent PNG) - Bottom left
-- **Poster** (2:3) - Bottom right
+### Artwork Selection
+![Grid of artwork options with quality badges, language tags, and filtering options]
 
-Click any section to add or change that specific artwork type!
+### Three-State Status System
+- **Green indicators**: Artwork is already downloaded
+- **Yellow indicators**: Artwork is missing - click to search or mark unavailable
+- **Red indicators**: Artwork has been marked as unavailable on TMDb
 
-### Filter & Search
-- Filter by missing artwork type (backdrops, logos, or posters)
-- Search/filter by title
-- See at a glance which items need attention
+## 🚀 Quick Start with Docker
 
-## Quick Start
+### 1. Create docker-compose.yml
 
-### Docker Compose (Recommended)
+```yaml
+version: '3.8'
 
-1. **Create a `.env` file**:
-```env
-TMDB_API_KEY=your_tmdb_api_key_here
-SLACK_WEBHOOK_URL=https://hooks.slack.com/services/YOUR/WEBHOOK/URL  # Optional
-SECRET_KEY=change-this-to-a-random-secret-key
-PUID=1000
-PGID=1000
+services:
+  mediarr:
+    image: swguru2004/mediarr:latest
+    container_name: mediarr
+    ports:
+      - "5000:5000"
+    environment:
+      - TMDB_API_KEY=your_tmdb_api_key_here
+      - MOVIE_FOLDERS=/movies
+      - TV_FOLDERS=/tv
+      - SLACK_WEBHOOK_URL=  # Optional
+    volumes:
+      # Mount your media directories
+      - /path/to/your/movies:/movies
+      - /path/to/your/tv:/tv
+      # Persistent storage for mappings and unavailability data
+      - ./mediarr-data:/app
+    restart: unless-stopped
 ```
 
-2. **Edit `docker-compose.yml`** - Update volume paths to match your media folders
+### 2. Create .env file
 
-3. **Run**:
+```bash
+TMDB_API_KEY=your_tmdb_api_key_here
+MOVIE_FOLDERS=/movies,/movies2
+TV_FOLDERS=/tv,/tv2
+SLACK_WEBHOOK_URL=https://hooks.slack.com/services/YOUR/WEBHOOK/URL
+```
+
+### 3. Start the application
+
 ```bash
 docker-compose up -d
 ```
 
-4. **Access**: http://localhost:5000
+### 4. Access the interface
 
-### Docker Run
+Open your browser to `http://localhost:5000`
 
-```bash
-docker run -d \
-  --name=mediarr \
-  -p 5000:5000 \
-  -e TMDB_API_KEY=your_api_key \
-  -e MOVIE_FOLDERS=/movies,/kids-movies \
-  -e TV_FOLDERS=/tv,/kids-tv \
-  -v /path/to/movies:/movies \
-  -v /path/to/tv:/tv \
-  -v ./data:/app/data \
-  --user 1000:1000 \
-  mediarr:latest
+## 📋 Requirements
+
+- **TMDb API Key**: [Get one here](https://www.themoviedb.org/settings/api) (free)
+- **Media Library**: Movies/TV shows organized in directories
+- **Docker** (recommended) or Python 3.12+
+
+## 🎯 How It Works
+
+### Artwork Status Indicators
+
+Each media item shows three emoji indicators:
+- 🎭 **Poster** status
+- 🏷️ **Logo** status
+- 🎬 **Backdrop** status
+
+### Workflow
+
+1. **Scan your library**: Mediarr automatically detects existing artwork
+2. **See what's missing**: Yellow indicators show missing artwork
+3. **Search and download**: Click search buttons to find and download artwork
+4. **Mark unavailable**: Click yellow indicators to mark artwork as unavailable if TMDb doesn't have it
+5. **Track progress**: Progress bars show completion percentage for each type
+
+### File Structure in Your Media Folders
+
+Mediarr creates the following files in each media directory:
+
+```
+Movie Name (2014) {tmdb-12345}/
+├── poster.jpg          # Full poster image
+├── poster-thumb.jpg    # Thumbnail (300x450)
+├── logo.png            # Full logo (transparent PNG)
+├── logo-thumb.png      # Logo thumbnail (300x150)
+├── backdrop.jpg        # Full backdrop image
+└── backdrop-thumb.jpg  # Backdrop thumbnail (300x169)
 ```
 
-## Configuration
+## 🔧 Configuration
 
 ### Environment Variables
 
 | Variable | Required | Default | Description |
 |----------|----------|---------|-------------|
-| `TMDB_API_KEY` | ✅ Yes | - | Your TMDb API key ([get one here](https://www.themoviedb.org/settings/api)) |
-| `MOVIE_FOLDERS` | No | `/movies,/kids-movies,/anime` | Comma-separated list of movie folders |
-| `TV_FOLDERS` | No | `/tv,/kids-tv` | Comma-separated list of TV show folders |
+| `TMDB_API_KEY` | Yes | - | Your TMDb API key |
+| `MOVIE_FOLDERS` | Yes | - | Comma-separated movie directory paths |
+| `TV_FOLDERS` | Yes | - | Comma-separated TV directory paths |
 | `SLACK_WEBHOOK_URL` | No | - | Slack webhook for notifications |
-| `PORT` | No | `5000` | Port to run the web server on |
-| `SECRET_KEY` | No | (auto-generated) | Flask secret key for sessions |
-| `PUID` | No | `1000` | User ID for file permissions |
-| `PGID` | No | `1000` | Group ID for file permissions |
 
-### Volume Mounts
+### Persistent Data Files
 
-- **Media folders**: Mount your movie and TV directories (read/write access needed)
-- **Data folder**: `./data:/app/data` - Stores TMDb ID mappings and artwork availability
+Mediarr creates these files in the app directory:
+- `artwork_unavailable.json` - Tracks which artwork is unavailable on TMDb
+- `directory_mapping.json` - Maps TMDb IDs to local directories
 
-### Folder Structure
+**Important**: Mount these files as volumes to persist data across container restarts.
 
-Mediarr expects your media to be organized like:
-```
-/movies/
-  ├── The Matrix (1999)/
-  │   ├── movie.mkv
-  │   ├── backdrop.jpg          # Downloaded by Mediarr
-  │   ├── backdrop-thumb.jpg    # Auto-generated thumbnail
-  │   ├── logo.png              # Downloaded by Mediarr
-  │   ├── logo-thumb.png        # Auto-generated thumbnail
-  │   ├── poster.jpg            # Downloaded by Mediarr
-  │   └── poster-thumb.jpg      # Auto-generated thumbnail
-  └── Inception (2010)/
-      └── ...
+## 💡 Pro Tips
 
-/tv/
-  ├── Breaking Bad/
-  │   ├── Season 01/
-  │   ├── backdrop.jpg
-  │   ├── logo.png
-  │   └── poster.jpg
-  └── ...
-```
+### Selecting Good Artwork
 
-## How It Works
+When selecting artwork, especially backdrops for Plex:
 
-### Three-Tier Directory Matching
+**✅ Good Choices:**
+- No text overlays (movie details will cover them)
+- Main subject positioned on the right side
+- High resolution (2000px+ width)
+- No language-specific text for international compatibility
 
-Mediarr uses a smart three-tier strategy to match TMDb results to your local directories:
+**❌ Avoid:**
+- Text that will be obscured by UI elements
+- Low resolution images (<1000px)
+- Centered composition (gets covered by metadata)
 
-1. **UI Hint** (Highest Priority) - When you click a card, the directory name is passed through the entire flow
-2. **Cached Mapping** - Previously saved TMDb ID → directory mappings from `/app/data/tmdb_directory_mapping.json`
-3. **Fuzzy Matching** (Fallback) - Normalized title matching with 90% similarity threshold
+### Using the Unavailability Feature
 
-This prevents the "backdrop overwriting" bug and ensures artwork always goes to the correct folder.
+If TMDb doesn't have a particular artwork type:
+1. Search for the artwork to confirm it's not available
+2. Click the yellow indicator for that artwork type
+3. It turns red and won't show in "Show Missing" filter anymore
+4. The status persists across sessions
 
-### Artwork Availability Tracking
-
-Mediarr remembers when TMDb doesn't have a specific artwork type:
-
-```json
-{
-  "movie_603": {
-    "directory": "/movies/The Matrix (1999)",
-    "last_checked": "2026-01-05",
-    "artwork_availability": {
-      "backdrop": true,
-      "logo": true,
-      "poster": false  // ← No posters available on TMDb
-    }
-  }
-}
-```
-
-This prevents repeated unsuccessful searches and survives container restarts.
-
-### SMB Mount Support
-
-Mediarr includes retry logic with exponential backoff for:
-- Directory listing (`safe_listdir`)
-- File serving (`safe_send_file`)
-
-This handles `BlockingIOError` exceptions common with SMB/NFS mounts.
-
-## Migrating from Separate Tools
-
-If you're currently running backgroundarr, logoarr, and postarr separately:
-
-1. **Stop all three containers**
-```bash
-docker stop backgroundarr logoarr postarr
-```
-
-2. **Backup existing mappings** (optional, logoarr only)
-```bash
-cp /path/to/logoarr/tmdb_directory_mapping.json ~/logoarr-mapping-backup.json
-```
-
-3. **Deploy Mediarr** with the same volume mounts
-
-4. **First run**: Mediarr will scan all existing artwork automatically
-
-5. **Verify**: Check that all your existing artwork shows up correctly
-
-6. **Remove old containers** once satisfied
-```bash
-docker rm backgroundarr logoarr postarr
-```
-
-**Note**: All your existing artwork files (`backdrop.jpg`, `logo.png`, `poster.jpg`) stay in place - no data loss!
-
-## API Endpoints
-
-Mediarr provides a RESTful-ish interface:
-
-| Endpoint | Method | Description |
-|----------|--------|-------------|
-| `/` | GET | Movies page with unified cards |
-| `/tv` | GET | TV shows page with unified cards |
-| `/dashboard` | GET | Statistics dashboard |
-| `/search_movie?query=...&artwork_type=...` | GET | Search TMDb for movies |
-| `/search_tv?query=...&artwork_type=...` | GET | Search TMDb for TV shows |
-| `/select/<media_type>/<tmdb_id>?artwork_type=...` | GET | View available artwork |
-| `/download_artwork` | POST | Download and save artwork |
-| `/artwork/<path>` | GET | Serve artwork files |
-| `/recheck/<media_type>/<tmdb_id>/<artwork_type>` | GET | Force recheck TMDb availability |
-
-## Development
-
-### Local Development
+## 🛠️ Building from Source
 
 ```bash
-# Clone the repo
-git clone https://github.com/anthonysnyder/Mediarr.git
-cd Mediarr
+# Clone the repository
+git clone https://github.com/anthonysnyder/backgroundarr.git
+cd backgroundarr
 
-# Create virtual environment
-python -m venv venv
-source venv/bin/activate  # or `venv\Scripts\activate` on Windows
+# Build the Docker image
+docker build -t mediarr .
 
-# Install dependencies
+# Or run locally with Python
 pip install -r requirements.txt
-
-# Set environment variables
-export TMDB_API_KEY=your_key_here
-export MOVIE_FOLDERS=/path/to/movies
-export TV_FOLDERS=/path/to/tv
-
-# Run
 python app.py
 ```
 
-### Project Structure
+## 📁 Project Structure
 
 ```
 mediarr/
-├── app.py                 # Main Flask application
-├── requirements.txt
-├── Dockerfile
-├── docker-compose.yml
-│
-├── services/              # Business logic
-│   ├── artwork_service.py    # Artwork operations
-│   ├── tmdb_service.py       # TMDb API client
-│   └── slack_service.py      # Slack notifications
-│
-├── utils/                 # Utilities
-│   ├── file_utils.py         # SMB-safe file operations
-│   ├── image_utils.py        # Thumbnail generation
-│   └── mapping_utils.py      # TMDb ID mappings
-│
-├── templates/             # Jinja2 templates
-│   ├── base.html
-│   ├── index.html            # Movies page
-│   ├── tv.html               # TV shows page
-│   ├── dashboard.html
-│   ├── search_results.html
-│   ├── artwork_selection.html
-│   └── error.html
-│
-├── static/
-│   └── css/
-│       └── style.css         # Main stylesheet
-│
-└── data/
-    └── tmdb_directory_mapping.json  # Persistent mappings
+├── app.py                      # Main Flask application
+├── templates/
+│   ├── collection.html         # Main unified collection view
+│   ├── artwork_selection.html  # Artwork selection grid
+│   └── search_results.html     # TMDb search results
+├── requirements.txt            # Python dependencies
+├── Dockerfile                  # Docker build configuration
+├── docker-compose.yml          # Docker Compose setup
+└── README.md                   # This file
 ```
 
-## Troubleshooting
+## 🔄 Migration from Backgroundarr
 
-### Artwork not downloading
+If you're upgrading from Backgroundarr:
 
-1. **Check logs**: `docker logs mediarr`
-2. **Verify TMDb API key**: Make sure it's valid and has permissions
-3. **Check permissions**: Ensure PUID/PGID have write access to media folders
-4. **Network issues**: Test TMDb connectivity from container
+1. Your existing backdrop files are **fully compatible**
+2. Mediarr will detect and display them automatically
+3. You can now add posters and logos to the same folders
+4. All your backdrop-thumb files will continue to work
 
-### Directory matching issues
+No migration needed - it's a drop-in replacement!
 
-1. **Check directory names**: Must match TMDb titles reasonably well
-2. **Use UI hint**: Click the card directly instead of searching
-3. **Manual selection**: If fuzzy matching fails, you'll see a directory picker
-4. **Check mapping file**: `cat data/tmdb_directory_mapping.json`
+## 🐛 Troubleshooting
 
-### SMB mount issues
+### SMB/NAS Mount Issues
 
-1. **Increase retries**: Mediarr retries 8 times with exponential backoff
-2. **Check mount health**: `ls -la /path/to/mount` from container
-3. **Review logs**: Look for `BlockingIOError` messages
+Mediarr includes retry logic for SMB mounts. If you see `BlockingIOError`, the app will automatically retry with exponential backoff.
 
-## Credits
+### Artwork Not Showing
 
-- **TMDb**: Artwork metadata from [The Movie Database](https://www.themoviedb.org/)
-- **Flask**: Python web framework
-- **Pillow**: Image processing
-- **Bootstrap**: UI framework
+1. Check that TMDb ID is in directory name: `Movie (2014) {tmdb-12345}`
+2. Verify artwork files exist: `poster.jpg`, `logo.png`, `backdrop.jpg`
+3. Check file permissions (should be readable by container user)
 
-## License
+### Progress Bars Not Updating
 
-MIT License - See LICENSE file for details
+Progress bars update on page refresh. After downloading artwork, refresh the page to see updated statistics.
 
-## Support
+## 🤝 Contributing
 
-- **Issues**: [GitHub Issues](https://github.com/anthonysnyder/Mediarr/issues)
-- **Discussions**: [GitHub Discussions](https://github.com/anthonysnyder/Mediarr/discussions)
+Contributions are welcome! Please:
+1. Fork the repository
+2. Create a feature branch
+3. Submit a pull request
+
+## 📄 License
+
+This project is licensed under the MIT License. See the `LICENSE` file for details.
+
+## 🙏 Acknowledgments
+
+- **TMDb** for providing the excellent free API
+- **Plex** for inspiring this project
+- All contributors and users who provide feedback
 
 ---
 
-Made with ❤️ for the *arr community
+**Note**: This application requires a free TMDb API key. Mediarr is not affiliated with or endorsed by TMDb or Plex.

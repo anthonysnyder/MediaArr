@@ -1,0 +1,633 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Media Collection - {{ media_type|title }}</title>
+    <link rel="stylesheet" href="https://stackpath.bootstrapcdn.com/bootstrap/4.5.2/css/bootstrap.min.css">
+    <style>
+        body {
+            background-color: #343a40;
+            color: #fff;
+        }
+        #wrapper {
+            display: flex;
+            width: 100%;
+        }
+        #sidebar-wrapper {
+            width: 250px;
+            background-color: #212529;
+            border-right: 1px solid #444;
+            position: fixed;
+            height: 100vh;
+            overflow-y: auto;
+        }
+        .sidebar-heading {
+            padding: 1rem;
+            font-size: 1.5rem;
+            background-color: #1d2124;
+            text-align: center;
+        }
+        .media-stats {
+            padding: 0.5rem 1rem;
+            background-color: #1d2124;
+            border-bottom: 1px solid #444;
+            font-size: 0.85rem;
+        }
+        .stat-item {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 0.5rem;
+        }
+        .stat-label {
+            color: #adb5bd;
+        }
+        .stat-value {
+            color: #fff;
+            font-weight: bold;
+        }
+        .progress-bar-container {
+            width: 100%;
+            height: 8px;
+            background-color: #343a40;
+            border-radius: 4px;
+            overflow: hidden;
+            margin-top: 3px;
+        }
+        .progress-bar-fill {
+            height: 100%;
+            transition: width 0.3s ease;
+        }
+        .progress-bar-fill.poster {
+            background: linear-gradient(90deg, #667eea 0%, #764ba2 100%);
+        }
+        .progress-bar-fill.logo {
+            background: linear-gradient(90deg, #f093fb 0%, #f5576c 100%);
+        }
+        .progress-bar-fill.backdrop {
+            background: linear-gradient(90deg, #4facfe 0%, #00f2fe 100%);
+        }
+        .sidebar-section {
+            padding: 1rem;
+            border-bottom: 1px solid #444;
+        }
+        .sidebar-section h6 {
+            font-size: 0.9rem;
+            color: #adb5bd;
+            margin-bottom: 0.5rem;
+            text-transform: uppercase;
+        }
+        .list-group-item {
+            background-color: #212529;
+            color: #fff;
+            border: none;
+            cursor: pointer;
+            padding: 0.5rem 1rem;
+        }
+        .list-group-item:hover {
+            background-color: #343a40;
+        }
+        .list-group-item.active {
+            background-color: #007bff;
+        }
+        #page-content-wrapper {
+            flex-grow: 1;
+            margin-left: 250px;
+            padding: 20px;
+        }
+        .content-area {
+            padding: 0;
+        }
+        .movie-grid {
+            display: flex;
+            flex-wrap: wrap;
+        }
+        .movie-card {
+            flex: 0 0 16.66%;
+            max-width: 16.66%;
+            padding: 10px;
+            box-sizing: border-box;
+        }
+        .movie-card-inner {
+            position: relative;
+            border: 2px solid transparent;
+            border-radius: 8px;
+            transition: border-color 0.2s;
+        }
+        .movie-card-inner:hover {
+            border-color: #007bff;
+        }
+        .movie-card-inner:hover .card-actions {
+            opacity: 1;
+        }
+        .card-actions {
+            position: absolute;
+            bottom: 5px;
+            left: 5px;
+            right: 5px;
+            display: flex;
+            gap: 5px;
+            opacity: 0;
+            transition: opacity 0.2s;
+            z-index: 10;
+        }
+        .card-action-btn {
+            flex: 1;
+            padding: 6px 4px;
+            font-size: 0.65rem;
+            line-height: 1.2;
+            border: none;
+            border-radius: 4px;
+            cursor: pointer;
+            background-color: rgba(0, 123, 255, 0.9);
+            color: white;
+            transition: background-color 0.2s;
+            text-align: center;
+        }
+        .card-action-btn:hover {
+            background-color: rgba(0, 123, 255, 1);
+        }
+        .movie-card img {
+            width: 100%;
+            height: auto;
+            object-fit: cover;
+            border-radius: 8px;
+        }
+        .movie-card h5 {
+            font-size: 0.9rem;
+            margin-top: 10px;
+            text-align: center;
+        }
+        .artwork-indicators {
+            position: absolute;
+            top: 5px;
+            right: 5px;
+            display: flex;
+            gap: 3px;
+            z-index: 5;
+        }
+        .artwork-indicator {
+            width: 24px;
+            height: 24px;
+            border-radius: 50%;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 0.7rem;
+            background-color: rgba(0,0,0,0.7);
+        }
+        .artwork-indicator.has {
+            background-color: #28a745;
+        }
+        .artwork-indicator.missing {
+            background-color: #ffc107;
+            cursor: pointer;
+        }
+        .artwork-indicator.missing:hover {
+            background-color: #e0a800;
+            transform: scale(1.1);
+        }
+        .artwork-indicator.unavailable {
+            background-color: #dc3545;
+        }
+        .artwork-display {
+            border-radius: 8px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 0.8rem;
+            background-size: cover;
+            background-position: center;
+        }
+        .poster-display {
+            height: 450px;
+        }
+        .logo-display {
+            height: 150px;
+        }
+        .backdrop-display {
+            height: 200px;
+        }
+        .placeholder {
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+        }
+    </style>
+</head>
+<body>
+<div id="wrapper">
+    <!-- Sidebar -->
+    <div class="bg-dark border-right" id="sidebar-wrapper">
+        <div class="sidebar-heading">Media Collection</div>
+
+        <!-- Media Statistics -->
+        <div class="media-stats">
+            <div class="stat-item">
+                <span class="stat-label">Total Items:</span>
+                <span class="stat-value" id="totalCount">{{ total_media }}</span>
+            </div>
+            {% for artwork_type, config in artwork_types.items() %}
+            <div style="margin-bottom: 0.75rem;">
+                <div style="display: flex; justify-content: space-between; font-size: 0.75rem; margin-bottom: 2px;">
+                    <span style="color: #adb5bd;">{{ config.emoji }} {{ config.name }}</span>
+                    <span style="color: #fff;" id="{{ artwork_type }}Percent">0%</span>
+                </div>
+                <div class="progress-bar-container">
+                    <div class="progress-bar-fill {{ artwork_type }}" id="{{ artwork_type }}Progress" style="width: 0%"></div>
+                </div>
+            </div>
+            {% endfor %}
+        </div>
+
+        <!-- Media Type Section -->
+        <div class="sidebar-section">
+            <h6>Media Type</h6>
+            <div class="list-group list-group-flush">
+                <a href="/" class="list-group-item {% if media_type == 'movie' %}active{% endif %}">📁 Movies</a>
+                <a href="/tv" class="list-group-item {% if media_type == 'tv' %}active{% endif %}">📺 TV Shows</a>
+            </div>
+        </div>
+
+        <!-- View Artwork Section -->
+        <div class="sidebar-section">
+            <h6>View Artwork</h6>
+            <div class="list-group list-group-flush">
+                {% for at, config in artwork_types.items() %}
+                <a href="/{{ 'movies' if media_type == 'movie' else media_type }}/{{ at }}"
+                   class="list-group-item {% if artwork_type == at %}active{% endif %}"
+                   data-artwork-type="{{ at }}">
+                    {{ config.emoji }} {{ config.name }}
+                </a>
+                {% endfor %}
+            </div>
+        </div>
+
+        <!-- How to Use Section -->
+        <div class="sidebar-section">
+            <h6>How to Use</h6>
+            <div style="font-size: 0.75rem; line-height: 1.6; color: #adb5bd;">
+                <div style="margin-bottom: 0.75rem;">
+                    <strong style="color: #fff;">1. Browse Your Media</strong><br>
+                    Switch between Movies and TV Shows, then view different artwork types (Posters, Logos, Backdrops).
+                </div>
+                <div style="margin-bottom: 0.75rem;">
+                    <strong style="color: #fff;">2. Download Missing Artwork</strong><br>
+                    Hover over any card and click the artwork button (📄 🎨 🖼️) to search TMDb and download artwork.
+                </div>
+                <div style="margin-bottom: 0.75rem;">
+                    <strong style="color: #fff;">3. Mark Unavailable</strong><br>
+                    Click yellow 🟡 indicators if artwork doesn't exist on TMDb to hide them from Missing filter.
+                </div>
+                <div style="margin-bottom: 0.75rem;">
+                    <strong style="color: #fff;">4. Refresh Cache</strong><br>
+                    After downloading new artwork outside the app, click "Refresh" to update the cache.
+                </div>
+            </div>
+        </div>
+
+        <!-- Legend Section -->
+        <div class="sidebar-section">
+            <h6>Status Legend</h6>
+            <div style="font-size: 0.85rem; line-height: 1.8;">
+                <div>
+                    <span style="display: inline-block; width: 18px; height: 18px; background-color: #28a745; border-radius: 50%; vertical-align: middle;"></span>
+                    <span style="margin-left: 8px;">Found / Saved</span>
+                </div>
+                <div>
+                    <span style="display: inline-block; width: 18px; height: 18px; background-color: #ffc107; border-radius: 50%; vertical-align: middle; cursor: pointer;"></span>
+                    <span style="margin-left: 8px;">Missing (click to mark)</span>
+                </div>
+                <div>
+                    <span style="display: inline-block; width: 18px; height: 18px; background-color: #dc3545; border-radius: 50%; vertical-align: middle;"></span>
+                    <span style="margin-left: 8px;">Not Available</span>
+                </div>
+            </div>
+        </div>
+
+        <!-- Actions Section -->
+        <div class="sidebar-section">
+            <h6>Actions</h6>
+            <button class="btn btn-sm btn-primary btn-block" id="showMissingBtn" style="margin-bottom: 0.5rem;">
+                Show Missing Logos
+            </button>
+            <a href="/refresh" class="btn btn-sm btn-secondary btn-block" style="margin-bottom: 0.5rem;">
+                Refresh Cache
+            </a>
+            <div style="font-size: 0.7rem; color: #6c757d; margin-top: 0.5rem; line-height: 1.3;">
+                Note: Refresh scans all directories and rebuilds the cache. This takes a few moments but ensures new artwork appears.
+            </div>
+        </div>
+    </div>
+
+    <!-- Main content area -->
+    <div id="page-content-wrapper">
+        <div class="content-area">
+            <h1 class="my-4">{{ media_type|title }} Collection - {{ artwork_types[artwork_type].name }}</h1>
+            <input type="text" placeholder="Filter by title..." class="form-control mb-4" id="searchInput">
+
+            <!-- Media grid -->
+            <div class="movie-grid">
+                {% for item in media %}
+                <div class="movie-card" id="{{ item.clean_id }}"
+                     data-tmdb-id="{{ item.tmdb_id or '' }}"
+                     data-directory="{{ item.title|escape }}">
+                    <div class="movie-card-inner">
+                        <!-- Artwork indicators -->
+                        <div class="artwork-indicators">
+                            {% for art_type, config in artwork_types.items() %}
+                            <div class="artwork-indicator
+                                {% if item['has_' + art_type] %}has
+                                {% elif item[art_type + '_unavailable'] %}unavailable
+                                {% else %}missing{% endif %}"
+                                 data-artwork-type="{{ art_type }}"
+                                 title="{{ config.name }} {% if item['has_' + art_type] %}Available{% elif item[art_type + '_unavailable'] %}Not Available{% else %}Missing{% endif %}">
+                                {{ config.emoji }}
+                            </div>
+                            {% endfor %}
+                        </div>
+
+                        <!-- Artwork display (varies based on current artwork_type) -->
+                        {% set display_class = artwork_type + '-display' %}
+                        {% set has_artwork = item['has_artwork'] %}
+                        {% set artwork_thumb_url = item.artwork_thumb %}
+                        <div class="artwork-display {{ display_class }} {% if not has_artwork %}placeholder{% endif %}"
+                             {% if artwork_thumb_url %}style="background-image: url('{{ artwork_thumb_url }}');"{% endif %}>
+                            {% if not has_artwork %}
+                                <span>No {{ artwork_types[artwork_type].name[:-1] }}</span>
+                            {% endif %}
+                        </div>
+
+                        <!-- Search buttons (shown on hover) -->
+                        <div class="card-actions">
+                            {% for art_type, config in artwork_types.items() %}
+                            <button class="card-action-btn"
+                                    onclick="searchArtwork('{{ item.title|replace("'", "\\'") }}', '{{ item.title|replace("'", "\\'") }}', '{{ art_type }}')">
+                                {{ config.emoji }}<br>{{ config.name }}
+                            </button>
+                            {% endfor %}
+                        </div>
+                    </div>
+                    <h5>{{ item.title }}</h5>
+                    <p style="font-size: 0.75rem; text-align: center; margin-top: 5px; line-height: 1.4;">
+                        <strong>Dimensions:</strong> {{ item.artwork_dimensions or '-' }}<br>
+                        <strong>Date Modified:</strong> {{ item.artwork_last_modified or '-' }}
+                    </p>
+                </div>
+                {% endfor %}
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Toast Container for Notifications -->
+<div id="toastContainer" style="position: fixed; top: 20px; right: 20px; z-index: 9999; min-width: 300px;"></div>
+
+<script>
+    const mediaType = '{{ media_type }}';
+    const artworkTypes = {{ artwork_types|tojson }};
+    let currentArtworkFilter = '{{ artwork_type }}'; // Initialize from server
+    let showingMissingOnly = false;
+
+    // Function to show toast notifications
+    function showToast(message, type = 'success') {
+        const toastContainer = document.getElementById('toastContainer');
+        const toast = document.createElement('div');
+        toast.className = 'toast-notification';
+        toast.style.cssText = `
+            background-color: ${type === 'success' ? '#28a745' : '#dc3545'};
+            color: white;
+            padding: 15px 20px;
+            margin-bottom: 10px;
+            border-radius: 8px;
+            box-shadow: 0 4px 12px rgba(0,0,0,0.3);
+            font-size: 0.9rem;
+            animation: slideIn 0.3s ease-out;
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+        `;
+
+        const icon = type === 'success' ? '✓' : '✗';
+        toast.innerHTML = `
+            <span><strong>${icon}</strong> ${message}</span>
+            <button onclick="this.parentElement.remove()" style="background: none; border: none; color: white; font-size: 1.2rem; cursor: pointer; margin-left: 10px; padding: 0 5px;">&times;</button>
+        `;
+
+        toastContainer.appendChild(toast);
+
+        // Auto-dismiss after 4 seconds
+        setTimeout(() => {
+            toast.style.animation = 'slideOut 0.3s ease-in';
+            setTimeout(() => toast.remove(), 300);
+        }, 4000);
+    }
+
+    // Add CSS animations
+    const style = document.createElement('style');
+    style.textContent = `
+        @keyframes slideIn {
+            from {
+                transform: translateX(400px);
+                opacity: 0;
+            }
+            to {
+                transform: translateX(0);
+                opacity: 1;
+            }
+        }
+        @keyframes slideOut {
+            from {
+                transform: translateX(0);
+                opacity: 1;
+            }
+            to {
+                transform: translateX(400px);
+                opacity: 0;
+            }
+        }
+    `;
+    document.head.appendChild(style);
+
+    // Show flash messages as toasts on page load
+    {% with messages = get_flashed_messages(with_categories=true) %}
+        {% if messages %}
+            {% for category, message in messages %}
+                showToast('{{ message|replace("'", "\\'") }}', '{{ category }}');
+            {% endfor %}
+        {% endif %}
+    {% endwith %}
+
+    // Calculate and update statistics
+    function updateStats() {
+        const mediaCards = document.querySelectorAll('.movie-card');
+        const total = mediaCards.length;
+        document.getElementById('totalCount').textContent = total;
+
+        // Count each artwork type
+        {% for artwork_type in artwork_types.keys() %}
+        let {{ artwork_type }}Count = 0;
+        mediaCards.forEach(card => {
+            const indicator = card.querySelector('[data-artwork-type="{{ artwork_type }}"]');
+            if (indicator && indicator.classList.contains('has')) {
+                {{ artwork_type }}Count++;
+            }
+        });
+        const {{ artwork_type }}Percent = total > 0 ? Math.round(({{ artwork_type }}Count / total) * 100) : 0;
+        document.getElementById('{{ artwork_type }}Percent').textContent = {{ artwork_type }}Percent + '%';
+        document.getElementById('{{ artwork_type }}Progress').style.width = {{ artwork_type }}Percent + '%';
+        {% endfor %}
+    }
+
+    // Initialize stats
+    updateStats();
+
+    // Search functionality
+    document.getElementById('searchInput').addEventListener('keyup', function() {
+        const query = this.value.toLowerCase();
+        document.querySelectorAll('.movie-card').forEach(card => {
+            const title = card.querySelector('h5').textContent.toLowerCase();
+            card.style.display = title.includes(query) ? 'block' : 'none';
+        });
+    });
+
+    // Update button text based on current artwork filter
+    function updateShowMissingButtonText() {
+        const btn = document.getElementById('showMissingBtn');
+        const artworkName = {
+            'poster': 'Posters',
+            'logo': 'Logos',
+            'backdrop': 'Backdrops'
+        }[currentArtworkFilter];
+
+        if (showingMissingOnly) {
+            btn.textContent = 'Show All';
+        } else {
+            btn.textContent = `Show Missing ${artworkName}`;
+        }
+    }
+
+    // Show Missing filter - context aware
+    document.getElementById('showMissingBtn').addEventListener('click', function() {
+        showingMissingOnly = !showingMissingOnly;
+        const mediaCards = document.querySelectorAll('.movie-card');
+
+        if (showingMissingOnly) {
+            this.classList.remove('btn-primary');
+            this.classList.add('btn-warning');
+
+            mediaCards.forEach(card => {
+                // Only show cards that are missing the currently selected artwork type
+                const indicator = card.querySelector(`.artwork-indicator[data-artwork-type="${currentArtworkFilter}"]`);
+                const isMissing = indicator && indicator.classList.contains('missing');
+                card.style.display = isMissing ? 'block' : 'none';
+            });
+        } else {
+            this.classList.remove('btn-warning');
+            this.classList.add('btn-primary');
+
+            mediaCards.forEach(card => {
+                card.style.display = 'block';
+            });
+        }
+
+        updateShowMissingButtonText();
+    });
+
+    // Initialize button text on page load
+    document.addEventListener('DOMContentLoaded', function() {
+        updateShowMissingButtonText();
+        attachIndicatorClickHandlers();
+
+        // Check if we should automatically show missing items
+        const urlParams = new URLSearchParams(window.location.search);
+        if (urlParams.get('show_missing') === 'true') {
+            // Trigger the show missing button click
+            document.getElementById('showMissingBtn').click();
+
+            // Clean up the URL parameter to avoid re-triggering on reload
+            const newUrl = window.location.pathname + window.location.hash;
+            window.history.replaceState({}, '', newUrl);
+        }
+    });
+
+    function attachIndicatorClickHandlers() {
+        const missingIndicators = document.querySelectorAll('.artwork-indicator.missing');
+
+        missingIndicators.forEach(indicator => {
+            indicator.addEventListener('click', function(e) {
+                e.stopPropagation();
+
+                const artworkType = this.dataset.artworkType;
+                const card = this.closest('.movie-card');
+                const directory = card.dataset.directory;
+
+                if (!directory) {
+                    showToast('Cannot identify this media', 'error');
+                    return;
+                }
+
+                // Call API to persist unavailability
+                fetch('/api/toggle_unavailable', {
+                    method: 'POST',
+                    headers: {'Content-Type': 'application/json'},
+                    body: JSON.stringify({
+                        directory: directory,
+                        artwork_type: artworkType
+                    })
+                })
+                .then(response => response.json())
+                .then(data => {
+                    if (data.success) {
+                        // Update UI
+                        this.classList.remove('missing');
+                        this.classList.add('unavailable');
+                        this.title = artworkType.charAt(0).toUpperCase() + artworkType.slice(1) + ' Not Available';
+                        this.style.cursor = 'default';
+
+                        showToast(artworkType.charAt(0).toUpperCase() + artworkType.slice(1) + ' marked as unavailable', 'success');
+                        updateStats();
+
+                        if (showingMissingOnly) {
+                            const remainingMissing = card.querySelectorAll('.artwork-indicator.missing');
+                            if (remainingMissing.length === 0) {
+                                card.style.display = 'none';
+                            }
+                        }
+                    } else {
+                        showToast('Failed to mark as unavailable: ' + (data.error || 'Unknown error'), 'error');
+                    }
+                })
+                .catch(error => {
+                    console.error('Error:', error);
+                    showToast('Error marking as unavailable', 'error');
+                });
+            });
+        });
+    }
+
+    function showConfirmation(message) {
+        const confirmation = document.createElement('div');
+        confirmation.textContent = '✓ ' + message;
+        confirmation.style.cssText = `
+            position: fixed; top: 20px; left: 50%; transform: translateX(-50%);
+            background-color: #dc3545; color: white; padding: 12px 24px;
+            border-radius: 8px; z-index: 2000;
+            box-shadow: 0 4px 8px rgba(0,0,0,0.3); font-size: 0.9rem;
+        `;
+        document.body.appendChild(confirmation);
+        setTimeout(() => confirmation.remove(), 2000);
+    }
+
+    function searchArtwork(title, directory, artworkType) {
+        // Strip year and TMDb ID from title for better search results
+        // e.g., "The 13th Warrior (1999) {tmdb-123}" becomes "The 13th Warrior"
+        const cleanTitle = title.replace(/\s*\(\d{4}\).*$/, '').trim();
+        window.location.href = `/search_${mediaType}?query=${encodeURIComponent(cleanTitle)}&directory=${encodeURIComponent(directory)}&artwork_type=${artworkType}`;
+    }
+</script>
+
+<!-- jQuery and Bootstrap JS for alert dismissible functionality -->
+<script src="https://code.jquery.com/jquery-3.5.1.slim.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/bootstrap@4.5.2/dist/js/bootstrap.bundle.min.js"></script>
+</body>
+</html>
