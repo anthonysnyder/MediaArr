@@ -31,8 +31,8 @@ def safe_send_file(path: str, **kwargs):
     """Send file with basic error handling. macOS handles SMB errors natively."""
     return send_file(path, **kwargs)
 
-# Unavailability tracking - persisted to JSON file
-UNAVAILABLE_DATA_FILE = os.path.join(os.path.dirname(__file__), 'unavailable_artwork.json')
+# Unavailability tracking - persisted to JSON file in data directory
+UNAVAILABLE_DATA_FILE = os.path.join(os.path.dirname(__file__), 'data', 'unavailable_artwork.json')
 
 def load_unavailable_data():
     """Load unavailable artwork tracking from JSON file."""
@@ -68,8 +68,8 @@ def mark_artwork_unavailable(directory, artwork_type, unavailable=True):
     unavailable_data[directory][artwork_type] = unavailable
     return save_unavailable_data(unavailable_data)
 
-# Local cache for artwork thumbnails
-CACHE_DIR = os.path.join(os.path.dirname(__file__), 'artwork_cache')
+# Local cache for artwork thumbnails - use persistent data directory
+CACHE_DIR = os.path.join(os.path.dirname(__file__), 'data', 'artwork_cache')
 CACHE_METADATA_FILE = os.path.join(CACHE_DIR, 'cache_metadata.json')
 
 def ensure_cache_dir():
