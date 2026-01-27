@@ -435,6 +435,10 @@ def get_artwork_data(base_folders=None, artwork_type='poster', use_cache=True):
                 entry = scan_single_directory(media_dir, media_path, artwork_type)
                 media_list.append(entry)
 
+                # Small delay every 50 directories to avoid overwhelming SMB mounts
+                if len(media_list) % 50 == 0:
+                    time.sleep(0.1)
+
     # Sort media list, ignoring leading "The" for more natural sorting
     media_list = sorted(media_list, key=lambda x: strip_leading_the(x['title'].lower()))
 
@@ -544,24 +548,29 @@ def tv_shows(artwork_type='poster'):
                          artwork_type=artwork_type,
                          artwork_types=ARTWORK_TYPES)
 
-# Route to trigger an incremental refresh - only scans new/removed directories
+# Route to trigger an incremental refresh - only refreshes current media type's poster cache
 @app.route('/refresh')
-def refresh():
-    print("Starting incremental refresh...", flush=True)
+@app.route('/refresh/<media_type>')
+@app.route('/refresh/<media_type>/<artwork_type>')
+def refresh(media_type='movie', artwork_type='poster'):
+    # Validate inputs
+    if artwork_type not in ARTWORK_TYPES:
+        artwork_type = 'poster'
 
-    # Save refresh timestamp
+    folders = movie_folders if media_type == 'movie' else tv_folders
+    print(f"Starting incremental refresh for {media_type}/{artwork_type}...", flush=True)
+
     save_cache_metadata({
         'last_refresh': datetime.now().isoformat(),
         'status': 'refreshing'
     })
 
-    # Incremental refresh for each artwork type for both movies and TV
-    for artwork_type in ARTWORK_TYPES:
-        incremental_refresh(movie_folders, artwork_type)
-        incremental_refresh(tv_folders, artwork_type)
+    # Only refresh the requested media type and artwork type
+    incremental_refresh(folders, artwork_type)
 
-    flash('Cache refreshed! Only new directories were scanned.', 'success')
-    return redirect(url_for('index'))
+    flash(f'Cache refreshed for {media_type} {artwork_type}s!', 'success')
+    route = 'index' if media_type == 'movie' else 'tv_shows'
+    return redirect(url_for(route, artwork_type=artwork_type))
 
 
 # Route to force a full cache rebuild (nuclear option)

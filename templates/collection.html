@@ -310,11 +310,11 @@
             <button class="btn btn-sm btn-primary btn-block" id="showMissingBtn" style="margin-bottom: 0.5rem;">
                 Show Missing Logos
             </button>
-            <a href="/refresh" class="btn btn-sm btn-secondary btn-block" style="margin-bottom: 0.5rem;">
+            <a href="/refresh/{{ media_type }}/{{ artwork_type }}" class="btn btn-sm btn-secondary btn-block" style="margin-bottom: 0.5rem;">
                 Refresh Cache
             </a>
             <div style="font-size: 0.7rem; color: #6c757d; margin-top: 0.5rem; line-height: 1.3;">
-                Note: Refresh scans all directories and rebuilds the cache. This takes a few moments but ensures new artwork appears.
+                Note: Refresh checks for new or removed directories and updates the cache incrementally.
             </div>
         </div>
     </div>
