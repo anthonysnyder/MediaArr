@@ -208,7 +208,7 @@ def update_single_cache_entry(media_type, artwork_type, directory_path):
         # Find the entry matching this directory
         directory_name = os.path.basename(directory_path)
         for item in media_list:
-            if item.get('directory') == directory_name or item.get('path') == directory_path:
+            if item.get('title') == directory_name or item.get('path') == directory_path:
                 # Re-scan just this directory to get updated artwork status
                 artwork_config = ARTWORK_TYPES[artwork_type]
                 file_prefix = artwork_config['file_prefix']
@@ -322,6 +322,83 @@ ARTWORK_TYPES = {
     }
 }
 
+# Scan a single media directory and return its cache entry dict
+def scan_single_directory(media_dir, media_path, artwork_type):
+    """Scan one media directory and return a dict for the cache entry."""
+    artwork_config = ARTWORK_TYPES.get(artwork_type, ARTWORK_TYPES['poster'])
+    file_prefix = artwork_config['file_prefix']
+
+    # Single listdir call to get all files - avoids hammering SMB with per-file exists checks
+    dir_files = set(safe_listdir(media_path))
+
+    artwork = None
+    artwork_thumb = None
+    artwork_dimensions = None
+    artwork_last_modified = None
+
+    # Search for artwork files in various image formats
+    for ext in ['jpg', 'jpeg', 'png']:
+        thumb_filename = f"{file_prefix}-thumb.{ext}"
+        artwork_filename = f"{file_prefix}.{ext}"
+
+        # Copy thumbnail to local cache and use cached URL
+        if thumb_filename in dir_files:
+            thumb_path = os.path.join(media_path, thumb_filename)
+            copy_to_cache(thumb_path, media_dir, thumb_filename)
+            artwork_thumb = get_cached_artwork_url(media_dir, thumb_filename)
+
+        # Full artwork still served from SMB (only thumbnails are cached)
+        if artwork_filename in dir_files:
+            artwork_path = os.path.join(media_path, artwork_filename)
+            artwork = f"/artwork/{urllib.parse.quote(media_dir)}/{artwork_filename}"
+
+            # Get artwork image dimensions
+            try:
+                with Image.open(artwork_path) as img:
+                    artwork_dimensions = f"{img.width}x{img.height}"
+            except Exception:
+                artwork_dimensions = "Unknown"
+
+            # Get last modified timestamp of the artwork
+            try:
+                timestamp = os.path.getmtime(artwork_path)
+                artwork_last_modified = datetime.fromtimestamp(timestamp).strftime('%Y-%m-%d')
+            except (BlockingIOError, OSError):
+                artwork_last_modified = None
+            break
+
+    # Check for all artwork types using in-memory file list
+    has_poster = any(f"poster-thumb.{ext}" in dir_files for ext in ['jpg', 'jpeg', 'png'])
+    has_logo = any(f"logo-thumb.{ext}" in dir_files for ext in ['jpg', 'jpeg', 'png'])
+    has_backdrop = any(f"backdrop-thumb.{ext}" in dir_files for ext in ['jpg', 'jpeg', 'png'])
+
+    # Generate a clean ID for HTML anchor and URL purposes
+    clean_id = generate_clean_id(media_dir)
+
+    # Check if artwork types are marked as unavailable
+    poster_unavailable = is_artwork_unavailable(media_dir, 'poster')
+    logo_unavailable = is_artwork_unavailable(media_dir, 'logo')
+    backdrop_unavailable = is_artwork_unavailable(media_dir, 'backdrop')
+
+    return {
+        'title': media_dir,
+        'path': media_path,
+        'artwork': artwork,
+        'artwork_thumb': artwork_thumb,
+        'artwork_dimensions': artwork_dimensions,
+        'artwork_last_modified': artwork_last_modified,
+        'clean_id': clean_id,
+        'has_artwork': bool(artwork_thumb),
+        'has_poster': has_poster,
+        'has_logo': has_logo,
+        'has_backdrop': has_backdrop,
+        'poster_unavailable': poster_unavailable,
+        'logo_unavailable': logo_unavailable,
+        'backdrop_unavailable': backdrop_unavailable,
+        'tmdb_id': None
+    }
+
+
 # Function to retrieve media directories and their associated artwork
 def get_artwork_data(base_folders=None, artwork_type='poster', use_cache=True):
     # Default to movie folders if no folders specified
@@ -337,10 +414,6 @@ def get_artwork_data(base_folders=None, artwork_type='poster', use_cache=True):
         if cached_list is not None:
             return cached_list, cached_total
 
-    # Get artwork configuration
-    artwork_config = ARTWORK_TYPES.get(artwork_type, ARTWORK_TYPES['poster'])
-    file_prefix = artwork_config['file_prefix']
-
     media_list = []
 
     # Iterate through specified base folders to find media with artwork
@@ -353,80 +426,14 @@ def get_artwork_data(base_folders=None, artwork_type='poster', use_cache=True):
         directories = safe_listdir(base_folder)
         print(f"Scanning {base_folder}: found {len(directories)} directories", flush=True)
         for media_dir in sorted(directories):
-            if media_dir.lower() in ["@eadir", "#recycle"]:  # Skip Synology NAS system folders (case-insensitive)
+            if media_dir.lower() in ["@eadir", "#recycle"]:
                 continue
 
             media_path = os.path.join(base_folder, media_dir)
 
             if safe_isdir(media_path):
-                # Single listdir call to get all files - avoids hammering SMB with per-file exists checks
-                dir_files = set(safe_listdir(media_path))
-
-                artwork = None
-                artwork_thumb = None
-                artwork_dimensions = None
-                artwork_last_modified = None
-
-                # Search for artwork files in various image formats
-                for ext in ['jpg', 'jpeg', 'png']:
-                    thumb_filename = f"{file_prefix}-thumb.{ext}"
-                    artwork_filename = f"{file_prefix}.{ext}"
-
-                    # Copy thumbnail to local cache and use cached URL
-                    if thumb_filename in dir_files:
-                        thumb_path = os.path.join(media_path, thumb_filename)
-                        copy_to_cache(thumb_path, media_dir, thumb_filename)
-                        artwork_thumb = get_cached_artwork_url(media_dir, thumb_filename)
-
-                    # Full artwork still served from SMB (only thumbnails are cached)
-                    if artwork_filename in dir_files:
-                        artwork_path = os.path.join(media_path, artwork_filename)
-                        artwork = f"/artwork/{urllib.parse.quote(media_dir)}/{artwork_filename}"
-
-                        # Get artwork image dimensions
-                        try:
-                            with Image.open(artwork_path) as img:
-                                artwork_dimensions = f"{img.width}x{img.height}"
-                        except Exception:
-                            artwork_dimensions = "Unknown"
-
-                        # Get last modified timestamp of the artwork
-                        try:
-                            timestamp = os.path.getmtime(artwork_path)
-                            artwork_last_modified = datetime.fromtimestamp(timestamp).strftime('%Y-%m-%d')
-                        except (BlockingIOError, OSError):
-                            artwork_last_modified = None
-                        break
-
-                # Check for all artwork types using in-memory file list
-                has_poster = any(f"poster-thumb.{ext}" in dir_files for ext in ['jpg', 'jpeg', 'png'])
-                has_logo = any(f"logo-thumb.{ext}" in dir_files for ext in ['jpg', 'jpeg', 'png'])
-                has_backdrop = any(f"backdrop-thumb.{ext}" in dir_files for ext in ['jpg', 'jpeg', 'png'])
-
-                # Generate a clean ID for HTML anchor and URL purposes
-                clean_id = generate_clean_id(media_dir)
-
-                # Check if artwork types are marked as unavailable
-                poster_unavailable = is_artwork_unavailable(media_dir, 'poster')
-                logo_unavailable = is_artwork_unavailable(media_dir, 'logo')
-                backdrop_unavailable = is_artwork_unavailable(media_dir, 'backdrop')
-
-                media_list.append({
-                    'title': media_dir,
-                    'artwork': artwork,
-                    'artwork_thumb': artwork_thumb,
-                    'artwork_dimensions': artwork_dimensions,
-                    'artwork_last_modified': artwork_last_modified,
-                    'clean_id': clean_id,
-                    'has_artwork': bool(artwork_thumb),
-                    'has_poster': has_poster,
-                    'has_logo': has_logo,
-                    'has_backdrop': has_backdrop,
-                    'poster_unavailable': poster_unavailable,
-                    'logo_unavailable': logo_unavailable,
-                    'backdrop_unavailable': backdrop_unavailable,
-                    'tmdb_id': None  # Will be populated later if needed
-                })
+                entry = scan_single_directory(media_dir, media_path, artwork_type)
+                media_list.append(entry)
 
     # Sort media list, ignoring leading "The" for more natural sorting
     media_list = sorted(media_list, key=lambda x: strip_leading_the(x['title'].lower()))
@@ -436,6 +443,66 @@ def get_artwork_data(base_folders=None, artwork_type='poster', use_cache=True):
     print(f"Scan complete: {total_count} total items found for {artwork_type}", flush=True)
 
     # Save scan results to cache
+    save_scan_cache(media_type, artwork_type, media_list, total_count)
+
+    return media_list, total_count
+
+
+def incremental_refresh(base_folders, artwork_type):
+    """Refresh cache incrementally - only scan new directories, remove deleted ones."""
+    media_type = 'movie' if base_folders == movie_folders else 'tv'
+
+    # Load existing cache
+    cached_list, cached_total = load_scan_cache(media_type, artwork_type)
+    if cached_list is None:
+        # No cache exists, do a full scan
+        print(f"No existing cache for {media_type}/{artwork_type}, doing full scan", flush=True)
+        return get_artwork_data(base_folders, artwork_type, use_cache=False)
+
+    # Build a set of currently cached directory titles for fast lookup
+    cached_by_title = {item['title']: item for item in cached_list}
+
+    # Get current directory listing from SMB (lightweight - just folder names)
+    current_dirs = {}  # title -> full_path
+    for base_folder in base_folders:
+        if not safe_exists(base_folder):
+            print(f"WARNING: Folder does not exist (yet): {base_folder}", flush=True)
+            continue
+
+        directories = safe_listdir(base_folder)
+        print(f"Incremental scan {base_folder}: found {len(directories)} directories", flush=True)
+        for media_dir in directories:
+            if media_dir.lower() in ["@eadir", "#recycle"]:
+                continue
+            media_path = os.path.join(base_folder, media_dir)
+            current_dirs[media_dir] = media_path
+
+    # Find new directories (in current but not in cache)
+    new_dirs = set(current_dirs.keys()) - set(cached_by_title.keys())
+    # Find removed directories (in cache but not in current)
+    removed_dirs = set(cached_by_title.keys()) - set(current_dirs.keys())
+
+    print(f"Incremental refresh for {media_type}/{artwork_type}: "
+          f"{len(new_dirs)} new, {len(removed_dirs)} removed, "
+          f"{len(cached_by_title) - len(removed_dirs)} kept", flush=True)
+
+    # Start with existing cached entries, minus removed ones
+    media_list = [item for item in cached_list if item['title'] not in removed_dirs]
+
+    # Scan only new directories
+    for media_dir in sorted(new_dirs):
+        media_path = current_dirs[media_dir]
+        if safe_isdir(media_path):
+            entry = scan_single_directory(media_dir, media_path, artwork_type)
+            media_list.append(entry)
+
+    # Re-sort
+    media_list = sorted(media_list, key=lambda x: strip_leading_the(x['title'].lower()))
+
+    total_count = len(media_list)
+    print(f"Incremental refresh complete: {total_count} total items for {artwork_type}", flush=True)
+
+    # Save updated cache
     save_scan_cache(media_type, artwork_type, media_list, total_count)
 
     return media_list, total_count
@@ -477,10 +544,29 @@ def tv_shows(artwork_type='poster'):
                          artwork_type=artwork_type,
                          artwork_types=ARTWORK_TYPES)
 
-# Route to trigger a manual refresh of media directories and rebuild cache
+# Route to trigger an incremental refresh - only scans new/removed directories
 @app.route('/refresh')
 def refresh():
-    # Clear the cache directory to force re-scan
+    print("Starting incremental refresh...", flush=True)
+
+    # Save refresh timestamp
+    save_cache_metadata({
+        'last_refresh': datetime.now().isoformat(),
+        'status': 'refreshing'
+    })
+
+    # Incremental refresh for each artwork type for both movies and TV
+    for artwork_type in ARTWORK_TYPES:
+        incremental_refresh(movie_folders, artwork_type)
+        incremental_refresh(tv_folders, artwork_type)
+
+    flash('Cache refreshed! Only new directories were scanned.', 'success')
+    return redirect(url_for('index'))
+
+
+# Route to force a full cache rebuild (nuclear option)
+@app.route('/refresh/full')
+def refresh_full():
     import shutil
     if os.path.exists(CACHE_DIR):
         try:
@@ -491,13 +577,12 @@ def refresh():
 
     ensure_cache_dir()
 
-    # Save cache rebuild timestamp
     save_cache_metadata({
         'last_refresh': datetime.now().isoformat(),
         'status': 'rebuilding'
     })
 
-    flash('Cache cleared! Rebuilding from SMB shares...', 'success')
+    flash('Cache cleared! Full rebuild from SMB shares...', 'success')
     return redirect(url_for('index'))
 
 # Route for searching movies using TMDb API
