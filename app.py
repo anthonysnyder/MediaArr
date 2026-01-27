@@ -179,12 +179,16 @@ def save_scan_cache(media_type, artwork_type, media_list, total):
         print(f"Error saving scan cache: {e}", flush=True)
 
 def load_scan_cache(media_type, artwork_type):
-    """Load cached directory scan results."""
+    """Load cached directory scan results. Returns None if cache is empty or missing."""
     cache_file = os.path.join(CACHE_DIR, f'scan_cache_{media_type}_{artwork_type}.json')
     if os.path.exists(cache_file):
         try:
             with open(cache_file, 'r') as f:
                 data = json.load(f)
+                # Treat empty caches as invalid - they were likely from a failed scan
+                if data['total'] == 0 and len(data.get('media_list', [])) == 0:
+                    print(f"Ignoring empty scan cache for {media_type}/{artwork_type}", flush=True)
+                    return None, None
                 print(f"Loaded scan cache for {media_type}/{artwork_type}: {data['total']} items from {data['timestamp']}", flush=True)
                 return data['media_list'], data['total']
         except Exception as e:
