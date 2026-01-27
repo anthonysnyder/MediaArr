@@ -449,9 +449,10 @@ def get_artwork_data(base_folders=None, artwork_type='poster', use_cache=True):
             return cached_list, cached_total
 
     media_list = []
+    BATCH_SIZE = 25  # Directories to scan before pausing
+    BATCH_PAUSE = 1.0  # Seconds to pause between batches so SMB mount can breathe
+    scan_count = 0
 
-    # Initial full scan uses lightweight entries (only listdir on base folders, no per-directory SMB calls)
-    # This prevents overwhelming the SMB mount with thousands of per-directory listdir calls
     for base_folder in base_folders:
         if not safe_exists(base_folder):
             print(f"WARNING: Folder does not exist (yet): {base_folder}", flush=True)
@@ -464,13 +465,20 @@ def get_artwork_data(base_folders=None, artwork_type='poster', use_cache=True):
                 continue
 
             media_path = os.path.join(base_folder, media_dir)
-            entry = create_lightweight_entry(media_dir, media_path)
-            media_list.append(entry)
+
+            if safe_isdir(media_path):
+                entry = scan_single_directory(media_dir, media_path, artwork_type)
+                media_list.append(entry)
+                scan_count += 1
+
+                # Throttle: pause between batches to avoid overwhelming SMB mount
+                if scan_count % BATCH_SIZE == 0:
+                    time.sleep(BATCH_PAUSE)
+                    print(f"  Scanned {scan_count} directories...", flush=True)
 
     # Sort media list, ignoring leading "The" for more natural sorting
     media_list = sorted(media_list, key=lambda x: strip_leading_the(x['title'].lower()))
 
-    # Log final count for debugging
     total_count = len(media_list)
     print(f"Scan complete: {total_count} total items found for {artwork_type}", flush=True)
 
