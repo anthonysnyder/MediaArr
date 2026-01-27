@@ -508,6 +508,72 @@ def create_lightweight_entry(media_dir, media_path):
     }
 
 
+def _derive_cache_from_existing(media_type, artwork_type):
+    """Try to derive a cache for artwork_type from any existing cache for the same media_type.
+    Since all scan entries include has_poster/has_logo/has_backdrop from the directory listing,
+    we can reuse those entries — just remap the artwork-specific fields (thumb URL, dimensions).
+    Returns (media_list, total) or (None, None) if no existing cache to derive from.
+    """
+    artwork_config = ARTWORK_TYPES[artwork_type]
+    file_prefix = artwork_config['file_prefix']
+
+    # Check all other artwork types for an existing cache
+    for other_type in ARTWORK_TYPES:
+        if other_type == artwork_type:
+            continue
+        cached_list, cached_total = load_scan_cache(media_type, other_type)
+        if cached_list is not None and cached_total > 0:
+            print(f"Deriving {media_type}/{artwork_type} cache from existing {media_type}/{other_type} cache ({cached_total} items)", flush=True)
+
+            # Build new entries with artwork-specific fields remapped
+            new_list = []
+            for item in cached_list:
+                # Determine if this artwork type exists based on the has_* flags
+                has_key = f'has_{artwork_type}'
+                has_artwork = item.get(has_key, False)
+
+                # Try to find cached thumbnail locally (no SMB needed)
+                artwork_thumb = None
+                artwork_url = None
+                if has_artwork:
+                    for ext in ['jpg', 'jpeg', 'png']:
+                        thumb_filename = f"{file_prefix}-thumb.{ext}"
+                        cache_path = get_cache_path(item['title'], thumb_filename)
+                        if os.path.exists(cache_path):
+                            artwork_thumb = get_cached_artwork_url(item['title'], thumb_filename)
+                            break
+                    # Set artwork URL for SMB serving
+                    for ext in ['jpg', 'jpeg', 'png']:
+                        artwork_url = f"/artwork/{urllib.parse.quote(item['title'])}/{file_prefix}.{ext}"
+                        break  # just use first extension as URL pattern
+
+                new_entry = {
+                    'title': item['title'],
+                    'path': item['path'],
+                    'artwork': artwork_url if has_artwork else None,
+                    'artwork_thumb': artwork_thumb,
+                    'artwork_dimensions': None,  # Not available without SMB read
+                    'artwork_last_modified': None,
+                    'clean_id': item['clean_id'],
+                    'has_artwork': has_artwork,
+                    'has_poster': item.get('has_poster', False),
+                    'has_logo': item.get('has_logo', False),
+                    'has_backdrop': item.get('has_backdrop', False),
+                    'poster_unavailable': item.get('poster_unavailable', False),
+                    'logo_unavailable': item.get('logo_unavailable', False),
+                    'backdrop_unavailable': item.get('backdrop_unavailable', False),
+                    'tmdb_id': item.get('tmdb_id'),
+                }
+                new_list.append(new_entry)
+
+            total_count = len(new_list)
+            save_scan_cache(media_type, artwork_type, new_list, total_count)
+            print(f"Derived cache saved: {total_count} items for {media_type}/{artwork_type}", flush=True)
+            return new_list, total_count
+
+    return None, None
+
+
 # Function to retrieve media directories and their associated artwork
 def get_artwork_data(base_folders=None, artwork_type='poster', use_cache=True):
     # Default to movie folders if no folders specified
@@ -523,7 +589,12 @@ def get_artwork_data(base_folders=None, artwork_type='poster', use_cache=True):
         if cached_list is not None:
             return cached_list, cached_total
 
-    # No cache — need to scan. Check if a scan is already running.
+        # No direct cache — try to derive from another artwork type's cache (zero SMB calls)
+        derived_list, derived_total = _derive_cache_from_existing(media_type, artwork_type)
+        if derived_list is not None:
+            return derived_list, derived_total
+
+    # No cache at all — need a full SMB scan. Check if one is already running.
     scan_key = _get_scan_key(media_type, artwork_type)
     progress = _scan_progress.get(scan_key)
     if progress and progress['status'] == 'scanning':
