@@ -58,6 +58,9 @@ def safe_listdir(path: str, retries=3):
             print(f"Error listing directory {path} after {retries} retries: Resource temporarily unavailable", flush=True)
             return []
         except (OSError, PermissionError) as e:
+            # ENOTDIR (errno 20) means path is a file, not a directory — not an SMB issue
+            if getattr(e, 'errno', None) == 20:
+                return []
             _smb_record_error()
             if attempt < retries - 1:
                 time.sleep(1.0 * (attempt + 1))
@@ -520,7 +523,7 @@ def get_artwork_data(base_folders=None, artwork_type='poster', use_cache=True):
         directories = safe_listdir(base_folder)
         print(f"Scanning {base_folder}: found {len(directories)} directories", flush=True)
         for media_dir in sorted(directories):
-            if media_dir.lower() in ["@eadir", "#recycle"]:
+            if media_dir.startswith('.') or media_dir.lower() in ["@eadir", "#recycle"]:
                 continue
 
             media_path = os.path.join(base_folder, media_dir)
@@ -628,7 +631,7 @@ def incremental_refresh(base_folders, artwork_type):
         directories = safe_listdir(base_folder)
         print(f"Incremental scan {base_folder}: found {len(directories)} directories", flush=True)
         for media_dir in directories:
-            if media_dir.lower() in ["@eadir", "#recycle"]:
+            if media_dir.startswith('.') or media_dir.lower() in ["@eadir", "#recycle"]:
                 continue
             media_path = os.path.join(base_folder, media_dir)
             current_dirs[media_dir] = media_path
