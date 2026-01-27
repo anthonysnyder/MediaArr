@@ -4,6 +4,7 @@ import re
 import urllib.parse
 import time
 import json
+import threading
 from flask import Flask, render_template, request, redirect, url_for, send_from_directory, send_file, Response, flash, get_flashed_messages, jsonify
 from difflib import get_close_matches, SequenceMatcher  # For string similarity
 from PIL import Image  # For image processing
@@ -39,6 +40,18 @@ def _smb_record_error():
 def _smb_record_success():
     """Record a successful SMB operation, reset error counter."""
     _smb_health['consecutive_errors'] = 0
+
+# Scan lock and progress tracking - prevents duplicate concurrent scans
+_scan_lock = threading.Lock()
+_scan_progress = {}  # key: "media_type/artwork_type" -> {status, scanned, total, started}
+
+def _get_scan_key(media_type, artwork_type):
+    return f"{media_type}/{artwork_type}"
+
+def get_scan_progress(media_type, artwork_type):
+    """Get current scan progress. Returns None if no scan is running."""
+    key = _get_scan_key(media_type, artwork_type)
+    return _scan_progress.get(key)
 
 # SMB-safe file operations with retry logic for transient errors
 def safe_listdir(path: str, retries=3):
@@ -510,57 +523,98 @@ def get_artwork_data(base_folders=None, artwork_type='poster', use_cache=True):
         if cached_list is not None:
             return cached_list, cached_total
 
-    media_list = []
-    BATCH_SIZE = 10  # Directories to scan before pausing
-    BATCH_PAUSE = 2.0  # Seconds to pause between batches so SMB mount can breathe
-    scan_count = 0
+    # No cache — need to scan. Check if a scan is already running.
+    scan_key = _get_scan_key(media_type, artwork_type)
+    progress = _scan_progress.get(scan_key)
+    if progress and progress['status'] == 'scanning':
+        # Scan already in progress — return None to signal "in progress"
+        return None, None
 
-    for base_folder in base_folders:
-        if not safe_exists(base_folder):
-            print(f"WARNING: Folder does not exist (yet): {base_folder}", flush=True)
-            continue
+    # Try to acquire lock — if another thread holds it, a scan is starting
+    if not _scan_lock.acquire(blocking=False):
+        return None, None
 
-        directories = safe_listdir(base_folder)
-        print(f"Scanning {base_folder}: found {len(directories)} directories", flush=True)
-        for media_dir in sorted(directories):
-            if media_dir.startswith('.') or media_dir.lower() in ["@eadir", "#recycle"]:
-                continue
+    try:
+        # Double-check cache (another thread may have just finished)
+        cached_list, cached_total = load_scan_cache(media_type, artwork_type)
+        if cached_list is not None:
+            return cached_list, cached_total
 
-            media_path = os.path.join(base_folder, media_dir)
+        # Start background scan
+        _scan_progress[scan_key] = {
+            'status': 'scanning',
+            'scanned': 0,
+            'total': 0,
+            'started': datetime.now().isoformat()
+        }
 
-            # Lightweight scan: listdir + filename checks only, no Image.open or file copies
-            # Skip safe_isdir to save an SMB stat call per directory
-            entry = scan_single_directory(media_dir, media_path, artwork_type, lightweight=True)
-            media_list.append(entry)
-            scan_count += 1
-
-            # Throttle: pause between batches to avoid overwhelming SMB mount
-            if scan_count % BATCH_SIZE == 0:
-                time.sleep(BATCH_PAUSE)
-                print(f"  Scanned {scan_count}/{len(directories)} directories...", flush=True)
-
-    # Sort media list, ignoring leading "The" for more natural sorting
-    media_list = sorted(media_list, key=lambda x: strip_leading_the(x['title'].lower()))
-
-    total_count = len(media_list)
-    print(f"Scan complete: {total_count} total items found for {artwork_type}", flush=True)
-
-    # Save scan results to cache
-    save_scan_cache(media_type, artwork_type, media_list, total_count)
-
-    # Start background thumbnail caching for items that have artwork but no cached thumb
-    import threading
-    items_needing_thumbs = [item for item in media_list if item.get('has_artwork') and not item.get('artwork_thumb')]
-    if items_needing_thumbs:
-        print(f"Starting background thumbnail caching for {len(items_needing_thumbs)} items...", flush=True)
         thread = threading.Thread(
-            target=_background_cache_thumbnails,
-            args=(media_type, artwork_type, items_needing_thumbs),
+            target=_background_scan,
+            args=(base_folders, media_type, artwork_type),
             daemon=True
         )
         thread.start()
+        return None, None
+    finally:
+        _scan_lock.release()
 
-    return media_list, total_count
+
+def _background_scan(base_folders, media_type, artwork_type):
+    """Run a full scan in the background with throttling."""
+    scan_key = _get_scan_key(media_type, artwork_type)
+    media_list = []
+    BATCH_SIZE = 10
+    BATCH_PAUSE = 2.0
+    scan_count = 0
+    total_dirs = 0
+
+    try:
+        for base_folder in base_folders:
+            if not safe_exists(base_folder):
+                print(f"WARNING: Folder does not exist (yet): {base_folder}", flush=True)
+                continue
+
+            directories = safe_listdir(base_folder)
+            # Filter out hidden and system directories
+            directories = [d for d in directories if not d.startswith('.') and d.lower() not in ["@eadir", "#recycle"]]
+            total_dirs += len(directories)
+            _scan_progress[scan_key]['total'] = total_dirs
+            print(f"Scanning {base_folder}: found {len(directories)} directories", flush=True)
+
+            for media_dir in sorted(directories):
+                media_path = os.path.join(base_folder, media_dir)
+
+                entry = scan_single_directory(media_dir, media_path, artwork_type, lightweight=True)
+                media_list.append(entry)
+                scan_count += 1
+                _scan_progress[scan_key]['scanned'] = scan_count
+
+                # Throttle: pause between batches
+                if scan_count % BATCH_SIZE == 0:
+                    time.sleep(BATCH_PAUSE)
+                    print(f"  Scanned {scan_count}/{total_dirs} directories...", flush=True)
+
+        # Sort and save
+        media_list = sorted(media_list, key=lambda x: strip_leading_the(x['title'].lower()))
+        total_count = len(media_list)
+        print(f"Scan complete: {total_count} total items found for {artwork_type}", flush=True)
+        save_scan_cache(media_type, artwork_type, media_list, total_count)
+
+        # Start background thumbnail caching
+        items_needing_thumbs = [item for item in media_list if item.get('has_artwork') and not item.get('artwork_thumb')]
+        if items_needing_thumbs:
+            print(f"Starting background thumbnail caching for {len(items_needing_thumbs)} items...", flush=True)
+            thread = threading.Thread(
+                target=_background_cache_thumbnails,
+                args=(media_type, artwork_type, items_needing_thumbs),
+                daemon=True
+            )
+            thread.start()
+
+        _scan_progress[scan_key] = {'status': 'complete', 'scanned': total_count, 'total': total_count}
+    except Exception as e:
+        print(f"Background scan error: {e}", flush=True)
+        _scan_progress[scan_key] = {'status': 'error', 'error': str(e)}
 
 
 def _background_cache_thumbnails(media_type, artwork_type, items):
@@ -677,6 +731,15 @@ def index(artwork_type='poster'):
 
     movies, total_movies = get_artwork_data(movie_folders, artwork_type)
 
+    # If scan is in progress, show progress page
+    if movies is None:
+        progress = get_scan_progress('movie', artwork_type)
+        return render_template('scan_progress.html',
+                             media_type='movie',
+                             artwork_type=artwork_type,
+                             artwork_types=ARTWORK_TYPES,
+                             progress=progress)
+
     # Render the unified collection page with tabs
     return render_template('collection.html',
                          media=movies,
@@ -695,6 +758,15 @@ def tv_shows(artwork_type='poster'):
 
     tv_shows, total_tv_shows = get_artwork_data(tv_folders, artwork_type)
 
+    # If scan is in progress, show progress page
+    if tv_shows is None:
+        progress = get_scan_progress('tv', artwork_type)
+        return render_template('scan_progress.html',
+                             media_type='tv',
+                             artwork_type=artwork_type,
+                             artwork_types=ARTWORK_TYPES,
+                             progress=progress)
+
     # Render the unified collection page with tabs
     return render_template('collection.html',
                          media=tv_shows,
@@ -702,6 +774,14 @@ def tv_shows(artwork_type='poster'):
                          media_type='tv',
                          artwork_type=artwork_type,
                          artwork_types=ARTWORK_TYPES)
+
+# API endpoint for scan progress polling
+@app.route('/api/scan_progress/<media_type>/<artwork_type>')
+def scan_progress_api(media_type, artwork_type):
+    progress = get_scan_progress(media_type, artwork_type)
+    if progress:
+        return jsonify(progress)
+    return jsonify({'status': 'idle'})
 
 # Route to trigger an incremental refresh - only refreshes current media type's poster cache
 @app.route('/refresh')
