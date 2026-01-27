@@ -10,22 +10,46 @@ from PIL import Image  # For image processing
 from datetime import datetime  # For handling dates and times
 from urllib.parse import unquote
 
-# Native macOS file operations - no retry logic needed
-# macOS SMB client handles transient errors automatically
-def safe_listdir(path: str):
-    """List directory contents. macOS handles SMB errors natively."""
-    try:
-        return os.listdir(path)
-    except (OSError, PermissionError) as e:
-        print(f"Error listing directory {path}: {e}", flush=True)
-        return []
+# SMB-safe file operations with retry logic for transient errors
+def safe_listdir(path: str, retries=3):
+    """List directory contents with retry logic for SMB mounts."""
+    for attempt in range(retries):
+        try:
+            return os.listdir(path)
+        except BlockingIOError:
+            if attempt < retries - 1:
+                time.sleep(0.5 * (attempt + 1))
+                continue
+            print(f"Error listing directory {path} after {retries} retries: Resource temporarily unavailable", flush=True)
+            return []
+        except (OSError, PermissionError) as e:
+            if attempt < retries - 1:
+                time.sleep(0.5 * (attempt + 1))
+                continue
+            print(f"Error listing directory {path}: {e}", flush=True)
+            return []
 
-def safe_exists(path: str):
-    """Check if path exists. macOS handles SMB errors natively."""
-    try:
-        return os.path.exists(path)
-    except (OSError, PermissionError):
-        return False
+def safe_exists(path: str, retries=3):
+    """Check if path exists with retry logic for SMB mounts."""
+    for attempt in range(retries):
+        try:
+            return os.path.exists(path)
+        except (BlockingIOError, OSError, PermissionError):
+            if attempt < retries - 1:
+                time.sleep(0.5 * (attempt + 1))
+                continue
+            return False
+
+def safe_isdir(path: str, retries=3):
+    """Check if path is a directory with retry logic for SMB mounts."""
+    for attempt in range(retries):
+        try:
+            return os.path.isdir(path)
+        except (BlockingIOError, OSError, PermissionError):
+            if attempt < retries - 1:
+                time.sleep(0.5 * (attempt + 1))
+                continue
+            return False
 
 def safe_send_file(path: str, **kwargs):
     """Send file with basic error handling. macOS handles SMB errors natively."""
@@ -334,7 +358,7 @@ def get_artwork_data(base_folders=None, artwork_type='poster', use_cache=True):
 
             media_path = os.path.join(base_folder, media_dir)
 
-            if os.path.isdir(media_path):
+            if safe_isdir(media_path):
                 artwork = None
                 artwork_thumb = None
                 artwork_dimensions = None
