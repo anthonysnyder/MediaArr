@@ -359,6 +359,9 @@ def get_artwork_data(base_folders=None, artwork_type='poster', use_cache=True):
             media_path = os.path.join(base_folder, media_dir)
 
             if safe_isdir(media_path):
+                # Single listdir call to get all files - avoids hammering SMB with per-file exists checks
+                dir_files = set(safe_listdir(media_path))
+
                 artwork = None
                 artwork_thumb = None
                 artwork_dimensions = None
@@ -366,18 +369,19 @@ def get_artwork_data(base_folders=None, artwork_type='poster', use_cache=True):
 
                 # Search for artwork files in various image formats
                 for ext in ['jpg', 'jpeg', 'png']:
-                    thumb_path = os.path.join(media_path, f"{file_prefix}-thumb.{ext}")
-                    artwork_path = os.path.join(media_path, f"{file_prefix}.{ext}")
+                    thumb_filename = f"{file_prefix}-thumb.{ext}"
+                    artwork_filename = f"{file_prefix}.{ext}"
 
                     # Copy thumbnail to local cache and use cached URL
-                    if safe_exists(thumb_path):
-                        thumb_filename = f"{file_prefix}-thumb.{ext}"
+                    if thumb_filename in dir_files:
+                        thumb_path = os.path.join(media_path, thumb_filename)
                         copy_to_cache(thumb_path, media_dir, thumb_filename)
                         artwork_thumb = get_cached_artwork_url(media_dir, thumb_filename)
 
                     # Full artwork still served from SMB (only thumbnails are cached)
-                    if safe_exists(artwork_path):
-                        artwork = f"/artwork/{urllib.parse.quote(media_dir)}/{file_prefix}.{ext}"
+                    if artwork_filename in dir_files:
+                        artwork_path = os.path.join(media_path, artwork_filename)
+                        artwork = f"/artwork/{urllib.parse.quote(media_dir)}/{artwork_filename}"
 
                         # Get artwork image dimensions
                         try:
@@ -394,18 +398,10 @@ def get_artwork_data(base_folders=None, artwork_type='poster', use_cache=True):
                             artwork_last_modified = None
                         break
 
-                # Check for all artwork types to populate indicator badges
-                has_poster = False
-                has_logo = False
-                has_backdrop = False
-
-                for ext in ['jpg', 'jpeg', 'png']:
-                    if safe_exists(os.path.join(media_path, f"poster-thumb.{ext}")):
-                        has_poster = True
-                    if safe_exists(os.path.join(media_path, f"logo-thumb.{ext}")):
-                        has_logo = True
-                    if safe_exists(os.path.join(media_path, f"backdrop-thumb.{ext}")):
-                        has_backdrop = True
+                # Check for all artwork types using in-memory file list
+                has_poster = any(f"poster-thumb.{ext}" in dir_files for ext in ['jpg', 'jpeg', 'png'])
+                has_logo = any(f"logo-thumb.{ext}" in dir_files for ext in ['jpg', 'jpeg', 'png'])
+                has_backdrop = any(f"backdrop-thumb.{ext}" in dir_files for ext in ['jpg', 'jpeg', 'png'])
 
                 # Generate a clean ID for HTML anchor and URL purposes
                 clean_id = generate_clean_id(media_dir)
