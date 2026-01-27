@@ -327,13 +327,16 @@ ARTWORK_TYPES = {
 }
 
 # Scan a single media directory and return its cache entry dict
-def scan_single_directory(media_dir, media_path, artwork_type):
-    """Scan one media directory and return a dict for the cache entry."""
+def scan_single_directory(media_dir, media_path, artwork_type, dir_files=None):
+    """Scan one media directory and return a dict for the cache entry.
+    If dir_files is provided, uses that instead of calling listdir (avoids SMB call).
+    """
     artwork_config = ARTWORK_TYPES.get(artwork_type, ARTWORK_TYPES['poster'])
     file_prefix = artwork_config['file_prefix']
 
-    # Single listdir call to get all files - avoids hammering SMB with per-file exists checks
-    dir_files = set(safe_listdir(media_path))
+    # Use provided file list or fetch from SMB
+    if dir_files is None:
+        dir_files = set(safe_listdir(media_path))
 
     artwork = None
     artwork_thumb = None
@@ -403,6 +406,33 @@ def scan_single_directory(media_dir, media_path, artwork_type):
     }
 
 
+# Create a lightweight cache entry without any per-directory SMB calls
+def create_lightweight_entry(media_dir, media_path):
+    """Create a cache entry using only the directory name - no SMB reads."""
+    clean_id = generate_clean_id(media_dir)
+    poster_unavailable = is_artwork_unavailable(media_dir, 'poster')
+    logo_unavailable = is_artwork_unavailable(media_dir, 'logo')
+    backdrop_unavailable = is_artwork_unavailable(media_dir, 'backdrop')
+
+    return {
+        'title': media_dir,
+        'path': media_path,
+        'artwork': None,
+        'artwork_thumb': None,
+        'artwork_dimensions': None,
+        'artwork_last_modified': None,
+        'clean_id': clean_id,
+        'has_artwork': False,
+        'has_poster': False,
+        'has_logo': False,
+        'has_backdrop': False,
+        'poster_unavailable': poster_unavailable,
+        'logo_unavailable': logo_unavailable,
+        'backdrop_unavailable': backdrop_unavailable,
+        'tmdb_id': None
+    }
+
+
 # Function to retrieve media directories and their associated artwork
 def get_artwork_data(base_folders=None, artwork_type='poster', use_cache=True):
     # Default to movie folders if no folders specified
@@ -420,9 +450,9 @@ def get_artwork_data(base_folders=None, artwork_type='poster', use_cache=True):
 
     media_list = []
 
-    # Iterate through specified base folders to find media with artwork
+    # Initial full scan uses lightweight entries (only listdir on base folders, no per-directory SMB calls)
+    # This prevents overwhelming the SMB mount with thousands of per-directory listdir calls
     for base_folder in base_folders:
-        # Check if folder exists using SMB-safe check
         if not safe_exists(base_folder):
             print(f"WARNING: Folder does not exist (yet): {base_folder}", flush=True)
             continue
@@ -434,14 +464,8 @@ def get_artwork_data(base_folders=None, artwork_type='poster', use_cache=True):
                 continue
 
             media_path = os.path.join(base_folder, media_dir)
-
-            if safe_isdir(media_path):
-                entry = scan_single_directory(media_dir, media_path, artwork_type)
-                media_list.append(entry)
-
-                # Small delay every 50 directories to avoid overwhelming SMB mounts
-                if len(media_list) % 50 == 0:
-                    time.sleep(0.1)
+            entry = create_lightweight_entry(media_dir, media_path)
+            media_list.append(entry)
 
     # Sort media list, ignoring leading "The" for more natural sorting
     media_list = sorted(media_list, key=lambda x: strip_leading_the(x['title'].lower()))
