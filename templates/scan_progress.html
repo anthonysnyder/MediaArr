@@ -1,0 +1,98 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Scanning - {{ media_type|title }} {{ artwork_types[artwork_type].name }}</title>
+    <link rel="stylesheet" href="https://stackpath.bootstrapcdn.com/bootstrap/4.5.2/css/bootstrap.min.css">
+    <style>
+        body {
+            background-color: #343a40;
+            color: #fff;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            min-height: 100vh;
+            margin: 0;
+        }
+        .scan-container {
+            text-align: center;
+            max-width: 500px;
+            padding: 2rem;
+        }
+        .progress {
+            height: 30px;
+            background-color: #212529;
+            border-radius: 15px;
+            margin: 1.5rem 0;
+        }
+        .progress-bar {
+            background-color: #28a745;
+            border-radius: 15px;
+            transition: width 0.5s ease;
+            font-size: 0.9rem;
+            line-height: 30px;
+        }
+        .scan-status {
+            font-size: 1.1rem;
+            color: #adb5bd;
+            margin-top: 1rem;
+        }
+        .spinner-border {
+            width: 3rem;
+            height: 3rem;
+            margin-bottom: 1rem;
+        }
+    </style>
+</head>
+<body>
+    <div class="scan-container">
+        <div class="spinner-border text-success" role="status">
+            <span class="sr-only">Scanning...</span>
+        </div>
+        <h2>Scanning {{ media_type|title }} {{ artwork_types[artwork_type].name }}</h2>
+        <p class="scan-status" id="status-text">
+            {% if progress %}
+                Scanned <span id="scanned">{{ progress.scanned }}</span> of <span id="total">{{ progress.total }}</span> directories...
+            {% else %}
+                Starting scan...
+            {% endif %}
+        </p>
+        <div class="progress">
+            <div class="progress-bar" role="progressbar" id="progress-bar"
+                 style="width: {% if progress and progress.total > 0 %}{{ (progress.scanned / progress.total * 100)|int }}{% else %}0{% endif %}%">
+                {% if progress and progress.total > 0 %}{{ (progress.scanned / progress.total * 100)|int }}%{% endif %}
+            </div>
+        </div>
+        <p style="font-size: 0.85rem; color: #6c757d;">Page will refresh automatically when scan is complete.</p>
+    </div>
+
+    <script>
+        function pollProgress() {
+            fetch('/api/scan_progress/{{ media_type }}/{{ artwork_type }}')
+                .then(r => r.json())
+                .then(data => {
+                    if (data.status === 'complete' || data.status === 'idle') {
+                        // Scan finished — reload to show results
+                        window.location.reload();
+                        return;
+                    }
+                    if (data.status === 'scanning') {
+                        var pct = data.total > 0 ? Math.round(data.scanned / data.total * 100) : 0;
+                        document.getElementById('scanned').textContent = data.scanned;
+                        document.getElementById('total').textContent = data.total;
+                        document.getElementById('progress-bar').style.width = pct + '%';
+                        document.getElementById('progress-bar').textContent = pct + '%';
+                    }
+                    // Poll again
+                    setTimeout(pollProgress, 2000);
+                })
+                .catch(() => {
+                    setTimeout(pollProgress, 3000);
+                });
+        }
+        // Start polling
+        setTimeout(pollProgress, 2000);
+    </script>
+</body>
+</html>
