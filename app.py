@@ -5,7 +5,7 @@ import urllib.parse
 import time
 import json
 import threading
-from flask import Flask, render_template, request, redirect, url_for, send_from_directory, send_file, Response, flash, get_flashed_messages, jsonify
+from flask import Flask, render_template, request, redirect, url_for, send_from_directory, send_file, Response, flash, get_flashed_messages, jsonify, make_response
 from difflib import get_close_matches, SequenceMatcher  # For string similarity
 from PIL import Image  # For image processing
 from datetime import datetime  # For handling dates and times
@@ -44,6 +44,7 @@ def _smb_record_success():
 # Scan lock and progress tracking - prevents duplicate concurrent scans
 _scan_lock = threading.Lock()
 _scan_progress = {}  # key: "media_type/artwork_type" -> {status, scanned, total, started}
+_thumb_cache_started = set()  # Track which background thumbnail threads have been started
 
 def _get_scan_key(media_type, artwork_type):
     return f"{media_type}/{artwork_type}"
@@ -52,6 +53,22 @@ def get_scan_progress(media_type, artwork_type):
     """Get current scan progress. Returns None if no scan is running."""
     key = _get_scan_key(media_type, artwork_type)
     return _scan_progress.get(key)
+
+def _maybe_start_thumb_caching(media_type, artwork_type, media_list):
+    """Start background thumbnail caching if needed and not already running."""
+    key = _get_scan_key(media_type, artwork_type)
+    if key in _thumb_cache_started:
+        return  # Already started for this type
+    items_needing_thumbs = [item for item in media_list if item.get('has_artwork') and not item.get('artwork_thumb')]
+    if items_needing_thumbs:
+        _thumb_cache_started.add(key)
+        print(f"Starting background thumbnail caching for {len(items_needing_thumbs)} {media_type}/{artwork_type} items...", flush=True)
+        thread = threading.Thread(
+            target=_background_cache_thumbnails,
+            args=(media_type, artwork_type, items_needing_thumbs),
+            daemon=True
+        )
+        thread.start()
 
 # SMB-safe file operations with retry logic for transient errors
 def safe_listdir(path: str, retries=3):
@@ -153,7 +170,32 @@ def mark_artwork_unavailable(directory, artwork_type, unavailable=True):
     if directory not in unavailable_data:
         unavailable_data[directory] = {}
     unavailable_data[directory][artwork_type] = unavailable
-    return save_unavailable_data(unavailable_data)
+    success = save_unavailable_data(unavailable_data)
+    if success:
+        _update_caches_unavailable(directory, artwork_type, unavailable)
+    return success
+
+def _update_caches_unavailable(directory, artwork_type, unavailable):
+    """Update all scan caches to reflect unavailability change."""
+    unavailable_key = f"{artwork_type}_unavailable"
+    cache_dir = os.path.join(os.path.dirname(__file__), 'data', 'artwork_cache')
+    for media_type in ['movie', 'tv']:
+        for art_type_key in ['poster', 'logo', 'backdrop']:
+            cache_file = os.path.join(cache_dir, f'scan_cache_{media_type}_{art_type_key}.json')
+            if os.path.exists(cache_file):
+                try:
+                    with open(cache_file, 'r') as f:
+                        cache_data = json.load(f)
+                    updated = False
+                    for item in cache_data.get('media_list', []):
+                        if item.get('title') == directory:
+                            item[unavailable_key] = unavailable
+                            updated = True
+                    if updated:
+                        with open(cache_file, 'w') as f:
+                            json.dump(cache_data, f)
+                except Exception as e:
+                    print(f"Error updating cache {cache_file}: {e}", flush=True)
 
 # Local cache for artwork thumbnails - use persistent data directory
 CACHE_DIR = os.path.join(os.path.dirname(__file__), 'data', 'artwork_cache')
@@ -569,6 +611,10 @@ def _derive_cache_from_existing(media_type, artwork_type):
             total_count = len(new_list)
             save_scan_cache(media_type, artwork_type, new_list, total_count)
             print(f"Derived cache saved: {total_count} items for {media_type}/{artwork_type}", flush=True)
+
+            # Kick off background thumbnail caching for items that have artwork but no local thumb
+            _maybe_start_thumb_caching(media_type, artwork_type, new_list)
+
             return new_list, total_count
 
     return None, None
@@ -587,6 +633,8 @@ def get_artwork_data(base_folders=None, artwork_type='poster', use_cache=True):
     if use_cache:
         cached_list, cached_total = load_scan_cache(media_type, artwork_type)
         if cached_list is not None:
+            # Start background thumbnail caching if any items are missing thumbs
+            _maybe_start_thumb_caching(media_type, artwork_type, cached_list)
             return cached_list, cached_total
 
         # No direct cache — try to derive from another artwork type's cache (zero SMB calls)
@@ -672,15 +720,7 @@ def _background_scan(base_folders, media_type, artwork_type):
         save_scan_cache(media_type, artwork_type, media_list, total_count)
 
         # Start background thumbnail caching
-        items_needing_thumbs = [item for item in media_list if item.get('has_artwork') and not item.get('artwork_thumb')]
-        if items_needing_thumbs:
-            print(f"Starting background thumbnail caching for {len(items_needing_thumbs)} items...", flush=True)
-            thread = threading.Thread(
-                target=_background_cache_thumbnails,
-                args=(media_type, artwork_type, items_needing_thumbs),
-                daemon=True
-            )
-            thread.start()
+        _maybe_start_thumb_caching(media_type, artwork_type, media_list)
 
         _scan_progress[scan_key] = {'status': 'complete', 'scanned': total_count, 'total': total_count}
     except Exception as e:
@@ -812,12 +852,17 @@ def index(artwork_type='poster'):
                              progress=progress)
 
     # Render the unified collection page with tabs
-    return render_template('collection.html',
+    # Use no-cache headers to ensure browser always fetches fresh data after navigation
+    response = make_response(render_template('collection.html',
                          media=movies,
                          total_media=total_movies,
                          media_type='movie',
                          artwork_type=artwork_type,
-                         artwork_types=ARTWORK_TYPES)
+                         artwork_types=ARTWORK_TYPES))
+    response.headers['Cache-Control'] = 'no-cache, no-store, must-revalidate'
+    response.headers['Pragma'] = 'no-cache'
+    response.headers['Expires'] = '0'
+    return response
 
 # Route for TV shows page with artwork type tabs
 @app.route('/tv')
@@ -839,12 +884,17 @@ def tv_shows(artwork_type='poster'):
                              progress=progress)
 
     # Render the unified collection page with tabs
-    return render_template('collection.html',
+    # Use no-cache headers to ensure browser always fetches fresh data after navigation
+    response = make_response(render_template('collection.html',
                          media=tv_shows,
                          total_media=total_tv_shows,
                          media_type='tv',
                          artwork_type=artwork_type,
-                         artwork_types=ARTWORK_TYPES)
+                         artwork_types=ARTWORK_TYPES))
+    response.headers['Cache-Control'] = 'no-cache, no-store, must-revalidate'
+    response.headers['Pragma'] = 'no-cache'
+    response.headers['Expires'] = '0'
+    return response
 
 # API endpoint for scan progress polling
 @app.route('/api/scan_progress/<media_type>/<artwork_type>')
@@ -1506,7 +1556,7 @@ def toggle_unavailable():
         current_status = is_artwork_unavailable(directory, artwork_type)
         new_status = not current_status
 
-        # Save the new status
+        # Save the new status (also updates all scan caches)
         success = mark_artwork_unavailable(directory, artwork_type, new_status)
 
         if success:
