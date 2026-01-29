@@ -301,54 +301,70 @@ def load_scan_cache(media_type, artwork_type):
     return None, None
 
 def update_single_cache_entry(media_type, artwork_type, directory_path):
-    """Update a single entry in the scan cache after downloading artwork."""
+    """Update a single entry in the scan cache after downloading artwork.
+    Updates both the current artwork type's cache and cross-type flags in all other caches.
+    """
+    directory_name = os.path.basename(directory_path)
+    has_key = f'has_{artwork_type}'
+
+    # Update the current artwork type's cache
     cache_file = os.path.join(CACHE_DIR, f'scan_cache_{media_type}_{artwork_type}.json')
     if not os.path.exists(cache_file):
         print(f"Cache file doesn't exist, skipping update: {cache_file}", flush=True)
         return False
 
     try:
-        # Load the current cache
         with open(cache_file, 'r') as f:
             data = json.load(f)
 
         media_list = data.get('media_list', [])
 
-        # Find the entry matching this directory
-        directory_name = os.path.basename(directory_path)
         for item in media_list:
             if item.get('title') == directory_name or item.get('path') == directory_path:
-                # Re-scan just this directory to get updated artwork status
                 artwork_config = ARTWORK_TYPES[artwork_type]
                 file_prefix = artwork_config['file_prefix']
 
-                # Check for artwork files
                 for ext in ['jpg', 'jpeg', 'png']:
                     artwork_path = os.path.join(directory_path, f'{file_prefix}.{ext}')
                     thumb_path = os.path.join(directory_path, f'{file_prefix}-thumb.{ext}')
 
                     if safe_exists(artwork_path):
-                        # Update the status to "found"
                         item['has_artwork'] = True
-                        item['artwork_status'] = 'found'
+                        item[has_key] = True
 
-                        # Copy thumbnail to cache if exists
                         if safe_exists(thumb_path):
                             thumb_filename = f"{file_prefix}-thumb.{ext}"
                             copy_to_cache(thumb_path, directory_name, thumb_filename)
                             item['artwork_thumb'] = get_cached_artwork_url(directory_name, thumb_filename)
 
-                        print(f"Updated cache entry for {directory_name}: artwork now found", flush=True)
+                        print(f"Updated cache entry for {directory_name}: {artwork_type} now found", flush=True)
                         break
 
-                # Save the updated cache
                 with open(cache_file, 'w') as f:
                     json.dump(data, f)
+                break
 
-                return True
+        # Also update the cross-type flag in all other artwork caches
+        for other_type in ARTWORK_TYPES:
+            if other_type == artwork_type:
+                continue
+            other_cache_file = os.path.join(CACHE_DIR, f'scan_cache_{media_type}_{other_type}.json')
+            if not os.path.exists(other_cache_file):
+                continue
+            try:
+                with open(other_cache_file, 'r') as f:
+                    other_data = json.load(f)
+                for item in other_data.get('media_list', []):
+                    if item.get('title') == directory_name or item.get('path') == directory_path:
+                        item[has_key] = True
+                        with open(other_cache_file, 'w') as f:
+                            json.dump(other_data, f)
+                        print(f"Updated cross-type flag {has_key} in {other_type} cache for {directory_name}", flush=True)
+                        break
+            except Exception as e:
+                print(f"Error updating cross-type cache {other_type}: {e}", flush=True)
 
-        print(f"Entry not found in cache for directory: {directory_name}", flush=True)
-        return False
+        return True
 
     except Exception as e:
         print(f"Error updating cache entry: {e}", flush=True)
@@ -678,14 +694,64 @@ def get_artwork_data(base_folders=None, artwork_type='poster', use_cache=True):
         _scan_lock.release()
 
 
+def _get_checkpoint_path(media_type, artwork_type):
+    """Get the file path for a scan checkpoint."""
+    return os.path.join(CACHE_DIR, f'scan_checkpoint_{media_type}_{artwork_type}.json')
+
+
+def _save_checkpoint(media_type, artwork_type, media_list, scanned_titles):
+    """Save scan progress to a checkpoint file for resume after restart."""
+    checkpoint_path = _get_checkpoint_path(media_type, artwork_type)
+    try:
+        with open(checkpoint_path, 'w') as f:
+            json.dump({
+                'media_list': media_list,
+                'scanned_titles': list(scanned_titles),
+                'timestamp': datetime.now().isoformat()
+            }, f)
+    except Exception as e:
+        print(f"Error saving checkpoint: {e}", flush=True)
+
+
+def _load_checkpoint(media_type, artwork_type):
+    """Load a scan checkpoint. Returns (media_list, scanned_titles_set) or (None, None)."""
+    checkpoint_path = _get_checkpoint_path(media_type, artwork_type)
+    if os.path.exists(checkpoint_path):
+        try:
+            with open(checkpoint_path, 'r') as f:
+                data = json.load(f)
+            media_list = data.get('media_list', [])
+            scanned_titles = set(data.get('scanned_titles', []))
+            print(f"Loaded checkpoint for {media_type}/{artwork_type}: "
+                  f"{len(scanned_titles)} directories already scanned (from {data.get('timestamp', '?')})", flush=True)
+            return media_list, scanned_titles
+        except Exception as e:
+            print(f"Error loading checkpoint: {e}", flush=True)
+    return None, None
+
+
+def _delete_checkpoint(media_type, artwork_type):
+    """Delete a scan checkpoint after successful completion."""
+    checkpoint_path = _get_checkpoint_path(media_type, artwork_type)
+    if os.path.exists(checkpoint_path):
+        os.remove(checkpoint_path)
+
+
 def _background_scan(base_folders, media_type, artwork_type):
-    """Run a full scan in the background with throttling."""
+    """Run a full scan in the background with throttling and checkpoint/resume support."""
     scan_key = _get_scan_key(media_type, artwork_type)
-    media_list = []
     BATCH_SIZE = 10
     BATCH_PAUSE = 2.0
     scan_count = 0
     total_dirs = 0
+
+    # Check for a checkpoint to resume from
+    media_list, scanned_titles = _load_checkpoint(media_type, artwork_type)
+    if media_list is None:
+        media_list = []
+        scanned_titles = set()
+    else:
+        scan_count = len(scanned_titles)
 
     try:
         for base_folder in base_folders:
@@ -701,15 +767,21 @@ def _background_scan(base_folders, media_type, artwork_type):
             print(f"Scanning {base_folder}: found {len(directories)} directories", flush=True)
 
             for media_dir in sorted(directories):
+                # Skip directories already scanned in a previous checkpoint
+                if media_dir in scanned_titles:
+                    continue
+
                 media_path = os.path.join(base_folder, media_dir)
 
                 entry = scan_single_directory(media_dir, media_path, artwork_type, lightweight=True)
                 media_list.append(entry)
+                scanned_titles.add(media_dir)
                 scan_count += 1
                 _scan_progress[scan_key]['scanned'] = scan_count
 
-                # Throttle: pause between batches
+                # Throttle: pause between batches and save checkpoint
                 if scan_count % BATCH_SIZE == 0:
+                    _save_checkpoint(media_type, artwork_type, media_list, scanned_titles)
                     time.sleep(BATCH_PAUSE)
                     print(f"  Scanned {scan_count}/{total_dirs} directories...", flush=True)
 
@@ -719,12 +791,18 @@ def _background_scan(base_folders, media_type, artwork_type):
         print(f"Scan complete: {total_count} total items found for {artwork_type}", flush=True)
         save_scan_cache(media_type, artwork_type, media_list, total_count)
 
+        # Clean up checkpoint — scan finished successfully
+        _delete_checkpoint(media_type, artwork_type)
+
         # Start background thumbnail caching
         _maybe_start_thumb_caching(media_type, artwork_type, media_list)
 
         _scan_progress[scan_key] = {'status': 'complete', 'scanned': total_count, 'total': total_count}
     except Exception as e:
         print(f"Background scan error: {e}", flush=True)
+        # Save checkpoint so scan can resume after restart
+        _save_checkpoint(media_type, artwork_type, media_list, scanned_titles)
+        print(f"Checkpoint saved: {len(scanned_titles)} directories scanned, will resume on next visit", flush=True)
         _scan_progress[scan_key] = {'status': 'error', 'error': str(e)}
 
 
@@ -904,7 +982,7 @@ def scan_progress_api(media_type, artwork_type):
         return jsonify(progress)
     return jsonify({'status': 'idle'})
 
-# Route to trigger an incremental refresh - only refreshes current media type's poster cache
+# Route to trigger a full re-scan — clears caches for this media type and triggers background scan
 @app.route('/refresh')
 @app.route('/refresh/<media_type>')
 @app.route('/refresh/<media_type>/<artwork_type>')
@@ -913,18 +991,27 @@ def refresh(media_type='movie', artwork_type='poster'):
     if artwork_type not in ARTWORK_TYPES:
         artwork_type = 'poster'
 
-    folders = movie_folders if media_type == 'movie' else tv_folders
-    print(f"Starting incremental refresh for {media_type}/{artwork_type}...", flush=True)
+    print(f"Refresh requested for {media_type}/{artwork_type} — clearing caches and triggering re-scan...", flush=True)
+
+    # Clear all artwork type caches and checkpoints for this media type so they get re-scanned
+    for art_type in ARTWORK_TYPES:
+        cache_file = os.path.join(CACHE_DIR, f'scan_cache_{media_type}_{art_type}.json')
+        if os.path.exists(cache_file):
+            os.remove(cache_file)
+            print(f"  Cleared cache: {media_type}/{art_type}", flush=True)
+        _delete_checkpoint(media_type, art_type)
+
+    # Reset background thumbnail tracking so thumbs get re-cached
+    for art_type in ARTWORK_TYPES:
+        key = _get_scan_key(media_type, art_type)
+        _thumb_cache_started.discard(key)
 
     save_cache_metadata({
         'last_refresh': datetime.now().isoformat(),
         'status': 'refreshing'
     })
 
-    # Only refresh the requested media type and artwork type
-    incremental_refresh(folders, artwork_type)
-
-    flash(f'Cache refreshed for {media_type} {artwork_type}s!', 'success')
+    # Redirect to collection page — it will detect no cache and trigger background scan with progress page
     route = 'index' if media_type == 'movie' else 'tv_shows'
     return redirect(url_for(route, artwork_type=artwork_type))
 
@@ -1491,6 +1578,10 @@ def confirm_directory():
     # Save the artwork and get the local path
     local_artwork_path = save_artwork_and_thumbnail(artwork_url, media_title, save_dir, artwork_type)
     if local_artwork_path:
+        # Update the cache entry for this specific item
+        media_type = 'movie' if content_type == 'movie' else 'tv'
+        update_single_cache_entry(media_type, artwork_type, save_dir)
+
         # Send Slack notification about successful download
         artwork_name = ARTWORK_TYPES[artwork_type]['name']
         message = f"{artwork_name[:-1]} for '{media_title}' has been downloaded!"
