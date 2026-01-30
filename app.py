@@ -1386,32 +1386,38 @@ def select_artwork():
         if artwork_type not in ARTWORK_TYPES:
             artwork_type = 'poster'
 
-        # Log detailed information about the artwork selection
-        app.logger.info(f"Artwork URL: {artwork_url}, Media Title: {media_title}, Media Type: {media_type}, Artwork Type: {artwork_type}, Directory: {directory}")
-
-        # If directory is provided and exists, use it directly (skip fuzzy matching)
-        if directory and safe_isdir(directory):
-            app.logger.info(f"Using provided directory directly: {directory}")
-            save_dir = directory
-            local_artwork_path = save_artwork_and_thumbnail(artwork_url, media_title, save_dir, artwork_type)
-            if local_artwork_path:
-                # Send Slack notification about successful artwork download
-                artwork_name = ARTWORK_TYPES[artwork_type]['name']
-                message = f"{artwork_name[:-1]} for '{media_title}' has been downloaded!"  # Remove trailing 's'
-                send_slack_notification(message, local_artwork_path, artwork_url)
-                # Flash message for browser notification
-                flash(message, 'success')
-
-                # Update the cache entry for this specific item
-                update_single_cache_entry(media_type, artwork_type, save_dir)
-            else:
-                flash(f"Failed to download {ARTWORK_TYPES[artwork_type]['name'][:-1]} for '{media_title}'", 'error')
-            # Redirect back to the same artwork type tab with missing filter enabled
-            redirect_url = url_for('tv_shows' if media_type == 'tv' else 'index', artwork_type=artwork_type, show_missing='true')
-            return redirect(f"{redirect_url}#{generate_clean_id(media_title)}")
-
         # Select base folders based on media type (movies or TV shows)
         base_folders = movie_folders if media_type == 'movie' else tv_folders
+
+        # Log detailed information about the artwork selection
+        print(f"Artwork URL: {artwork_url}, Media Title: {media_title}, Media Type: {media_type}, Artwork Type: {artwork_type}, Directory: {directory}", flush=True)
+
+        # If directory name is provided, resolve it to a full path and use it directly
+        if directory:
+            # Directory is a folder name, need to find the full path in base folders
+            for base_folder in base_folders:
+                potential_path = os.path.join(base_folder, directory)
+                if safe_isdir(potential_path):
+                    print(f"Using provided directory directly: {potential_path}", flush=True)
+                    save_dir = potential_path
+                    local_artwork_path = save_artwork_and_thumbnail(artwork_url, media_title, save_dir, artwork_type)
+                    if local_artwork_path:
+                        # Send Slack notification about successful artwork download
+                        artwork_name = ARTWORK_TYPES[artwork_type]['name']
+                        message = f"{artwork_name[:-1]} for '{media_title}' has been downloaded!"  # Remove trailing 's'
+                        send_slack_notification(message, local_artwork_path, artwork_url)
+                        # Flash message for browser notification
+                        flash(message, 'success')
+
+                        # Update the cache entry for this specific item
+                        update_single_cache_entry(media_type, artwork_type, save_dir)
+                    else:
+                        flash(f"Failed to download {ARTWORK_TYPES[artwork_type]['name'][:-1]} for '{media_title}'", 'error')
+                    # Redirect back to the same artwork type tab with missing filter enabled
+                    redirect_url = url_for('tv_shows' if media_type == 'tv' else 'index', artwork_type=artwork_type, show_missing='true')
+                    return redirect(f"{redirect_url}#{generate_clean_id(media_title)}")
+            # If we get here, directory was provided but not found - log and fall through to fuzzy matching
+            print(f"Warning: Provided directory '{directory}' not found in any base folder, falling back to fuzzy matching", flush=True)
 
         # Initialize variables for directory matching
         save_dir = None
@@ -1427,19 +1433,19 @@ def select_artwork():
             directories = safe_listdir(base_folder)
             possible_dirs.extend(directories)
 
-            for directory in directories:
-                normalized_dir_name = normalize_title(directory)
+            for dir_name in directories:
+                normalized_dir_name = normalize_title(dir_name)
                 # Calculate string similarity between media title and directory name
                 similarity = SequenceMatcher(None, normalized_media_title, normalized_dir_name).ratio()
 
                 # Update best match if current similarity is higher
                 if similarity > best_similarity:
                     best_similarity = similarity
-                    best_match_dir = os.path.join(base_folder, directory)
+                    best_match_dir = os.path.join(base_folder, dir_name)
 
                 # If exact match found, set save directory
-                if directory == media_title:
-                    save_dir = os.path.join(base_folder, directory)
+                if dir_name == media_title:
+                    save_dir = os.path.join(base_folder, dir_name)
                     break
 
             if save_dir:
