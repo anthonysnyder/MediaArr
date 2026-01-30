@@ -252,12 +252,19 @@
             form.method = 'POST';
             form.action = '{{ url_for("select_artwork") }}';
 
+            // Use a textarea to decode HTML entities properly
+            const decodeHtml = (html) => {
+                const txt = document.createElement('textarea');
+                txt.innerHTML = html;
+                return txt.value;
+            };
+
             const fields = {
                 'artwork_url': artworkUrl,
-                'media_title': '{{ media_title }}',
+                'media_title': decodeHtml('{{ media_title }}'),
                 'media_type': '{{ content_type }}',
                 'artwork_type': '{{ artwork_type }}',
-                'directory': '{{ directory|default("", true) }}'
+                'directory': decodeHtml('{{ directory|default("", true) }}')
             };
 
             for (const [key, value] of Object.entries(fields)) {
