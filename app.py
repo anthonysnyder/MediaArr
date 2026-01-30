@@ -1168,7 +1168,8 @@ def select_movie(movie_id, artwork_type='poster'):
                          artwork=formatted_artwork,
                          artwork_type=artwork_type,
                          artwork_config=artwork_config,
-                         tmdb_id=movie_id)
+                         tmdb_id=movie_id,
+                         directory=directory)
 
 # Route for selecting a TV show and displaying available artwork
 @app.route('/select_tv/<int:tv_id>', methods=['GET'])
@@ -1227,7 +1228,8 @@ def select_tv(tv_id, artwork_type='poster'):
                          artwork=formatted_artwork,
                          artwork_type=artwork_type,
                          artwork_config=artwork_config,
-                         tmdb_id=tv_id)
+                         tmdb_id=tv_id,
+                         directory=directory)
 
 # Function to handle artwork download and thumbnail creation
 def save_artwork_and_thumbnail(artwork_url, media_title, save_dir, artwork_type='poster'):
@@ -1378,13 +1380,35 @@ def select_artwork():
         media_title = request.form['media_title']
         media_type = request.form['media_type']  # Should be either 'movie' or 'tv'
         artwork_type = request.form.get('artwork_type', 'poster')  # Default to poster for backwards compat
+        directory = request.form.get('directory', '')  # Direct directory path if provided
 
         # Validate artwork type
         if artwork_type not in ARTWORK_TYPES:
             artwork_type = 'poster'
 
         # Log detailed information about the artwork selection
-        app.logger.info(f"Artwork URL: {artwork_url}, Media Title: {media_title}, Media Type: {media_type}, Artwork Type: {artwork_type}")
+        app.logger.info(f"Artwork URL: {artwork_url}, Media Title: {media_title}, Media Type: {media_type}, Artwork Type: {artwork_type}, Directory: {directory}")
+
+        # If directory is provided and exists, use it directly (skip fuzzy matching)
+        if directory and safe_isdir(directory):
+            app.logger.info(f"Using provided directory directly: {directory}")
+            save_dir = directory
+            local_artwork_path = save_artwork_and_thumbnail(artwork_url, media_title, save_dir, artwork_type)
+            if local_artwork_path:
+                # Send Slack notification about successful artwork download
+                artwork_name = ARTWORK_TYPES[artwork_type]['name']
+                message = f"{artwork_name[:-1]} for '{media_title}' has been downloaded!"  # Remove trailing 's'
+                send_slack_notification(message, local_artwork_path, artwork_url)
+                # Flash message for browser notification
+                flash(message, 'success')
+
+                # Update the cache entry for this specific item
+                update_single_cache_entry(media_type, artwork_type, save_dir)
+            else:
+                flash(f"Failed to download {ARTWORK_TYPES[artwork_type]['name'][:-1]} for '{media_title}'", 'error')
+            # Redirect back to the same artwork type tab with missing filter enabled
+            redirect_url = url_for('tv_shows' if media_type == 'tv' else 'index', artwork_type=artwork_type, show_missing='true')
+            return redirect(f"{redirect_url}#{generate_clean_id(media_title)}")
 
         # Select base folders based on media type (movies or TV shows)
         base_folders = movie_folders if media_type == 'movie' else tv_folders

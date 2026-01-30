@@ -256,7 +256,8 @@
                 'artwork_url': artworkUrl,
                 'media_title': '{{ media_title }}',
                 'media_type': '{{ content_type }}',
-                'artwork_type': '{{ artwork_type }}'
+                'artwork_type': '{{ artwork_type }}',
+                'directory': '{{ directory|default("", true) }}'
             };
 
             for (const [key, value] of Object.entries(fields)) {
