@@ -307,6 +307,8 @@ def update_single_cache_entry(media_type, artwork_type, directory_path):
     directory_name = os.path.basename(directory_path)
     has_key = f'has_{artwork_type}'
 
+    print(f"update_single_cache_entry called: media_type={media_type}, artwork_type={artwork_type}, directory_path={directory_path}, directory_name={directory_name}", flush=True)
+
     # Update the current artwork type's cache
     cache_file = os.path.join(CACHE_DIR, f'scan_cache_{media_type}_{artwork_type}.json')
     if not os.path.exists(cache_file):
@@ -318,9 +320,14 @@ def update_single_cache_entry(media_type, artwork_type, directory_path):
             data = json.load(f)
 
         media_list = data.get('media_list', [])
+        found_match = False
 
         for item in media_list:
-            if item.get('title') == directory_name or item.get('path') == directory_path:
+            item_title = item.get('title')
+            item_path = item.get('path')
+            if item_title == directory_name or item_path == directory_path:
+                found_match = True
+                print(f"Found matching cache entry: title='{item_title}', path='{item_path}'", flush=True)
                 artwork_config = ARTWORK_TYPES[artwork_type]
                 file_prefix = artwork_config['file_prefix']
 
@@ -343,6 +350,12 @@ def update_single_cache_entry(media_type, artwork_type, directory_path):
                 with open(cache_file, 'w') as f:
                     json.dump(data, f)
                 break
+
+        if not found_match:
+            print(f"WARNING: No matching cache entry found for directory_name='{directory_name}' or directory_path='{directory_path}'", flush=True)
+            # Log first few entries to help debug
+            for i, item in enumerate(media_list[:5]):
+                print(f"  Cache entry {i}: title='{item.get('title')}', path='{item.get('path')}'", flush=True)
 
         # Also update the cross-type flag in all other artwork caches
         for other_type in ARTWORK_TYPES:
